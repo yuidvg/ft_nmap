@@ -1,37 +1,3 @@
-# ft_nmap
-
-_Summary: This project is about recoding a part of the nmap port scanner._
-
-_Version: 4._
-
-
-## Contents
-
-- I Introduction
-- II Objectives
-- III General Instructions
-- IV Mandatory Part
-- V Bonus Part
-- VI Submission and peer-evaluation
-
-
-# Chapter I
-
-# Introduction
-
-Nmap is a free ports scanner created by Fyodor and distributed by Insecure.org. It is
-
-conceived to detect open ports, identify hosted services and obtain information on the
-
-operating system of a distant computer. This software has become a reference for network
-
-admin because the audit of Nmap reports give indications on the network security. It is
-
-available for Windows, Mac OS X, Linux, BSD and Solaris.
-
-
-# Chapter II
-
 # Objectives
 
 The goal of this project is to make you recode a part of nmap and therefore discover a
@@ -48,9 +14,6 @@ chosen ports.
 This project implies to use mostly the PCAP library (-lpcap) and
 
 THREAD (-lpthread)
-
-
-# Chapter III
 
 # General Instructions
 
@@ -73,8 +36,6 @@ library, as well as the entire pcap and pthread libraries.
 
 - You can use other libraries as part of bonuses, but you’ll have to jutify it.
 
-
-# Chapter IV
 
 # Mandatory Part
 
@@ -243,32 +204,6 @@ UDP(Open|Filtered) Closed
 XMAS(Closed) ACK(Unfiltered)
 UDP(Open|Filtered) Closed
 
-
-# Chapter V
-
-# Bonus Part
-
-Find below a few ideas of interesting bonuses:
-
-- DNS/Version management.
-- OS detection.
-- Flag to go over the IDS/Firewall.
-- Being able to hide the source address.
-- Additional flags...
-
-The -v/-V flag is not a valid bonus.
-
-The bonus part will only be assessed if the mandatory part is
-
-PERFECT. Perfect means the mandatory part has been integrally done
-
-and works without malfunctioning. If you have not passed ALL the
-
-mandatory requirements, your bonus part will not be evaluated at all.
-
-
-# Chapter VI
-
 # Submission and peer-evaluation
 
 Turn in your assignment in yourGitrepository as usual. Only the work inside your repos-
@@ -280,5 +215,3 @@ your folders and files to ensure they are correct.
 - You have to be in a VM with a Linux kernel > 3.14. Note that grading was designed
 
 on a Debian 7.0 stable.
-
-
