@@ -1,0 +1,9 @@
+Host ft-nmap-vm
+    HostName 127.0.0.1
+    User alice
+    Port 2222
+    ForwardAgent yes
+    StrictHostKeyChecking no
+    UserKnownHostsFile=/dev/null
+    RemoteCommand cd /workspace && exec $SHELL
+    RequestTTY yes
