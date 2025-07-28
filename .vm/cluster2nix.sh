@@ -356,12 +356,14 @@ build_and_enter_nix_container() {
 
     if [[ -n "$CMD_TO_RUN" ]]; then
         exec docker run $tty_flag --rm --privileged \
+            -p 2222:2222 \
             -v "$(pwd)":/workspace \
             -w /workspace \
             "$IMAGE_NAME" \
             bash -c "$CMD_TO_RUN"
     else
         exec docker run $tty_flag --rm --privileged \
+            -p 2222:2222 \
             -v "$(pwd)":/workspace \
             -w /workspace \
             "$IMAGE_NAME" \
