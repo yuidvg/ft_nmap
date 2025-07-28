@@ -72,7 +72,10 @@ clean:
 re: clean
 	$(MAKE) all
 
-.PHONY: all app debug test clean re run-test
+vm:
+	./.vm/cluster2nixos-vm.sh
+
+.PHONY: all app debug test clean re run-test vm
 
 # Debug
 $(DEBUG_BIN): $(DEBUG_OBJ)
