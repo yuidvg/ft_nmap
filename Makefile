@@ -72,7 +72,15 @@ clean:
 re: clean
 	$(MAKE) all
 
-.PHONY: all app debug test clean re run-test
+vm-up:
+	./.vm/cluster2nixos-vm.sh
+
+vm-down:
+	./.vm/shutdown.sh
+
+vm-restart: vm-down vm-up
+
+.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart
 
 # Debug
 $(DEBUG_BIN): $(DEBUG_OBJ)
