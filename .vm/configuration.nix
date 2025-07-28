@@ -27,6 +27,7 @@
     git
     gcc
     gnumake
+    libpcap
   ];
 
   # Automatically log in as root on the console
