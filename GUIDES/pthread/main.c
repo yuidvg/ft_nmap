@@ -23,7 +23,7 @@ typedef struct {
 } TaskManager;
 
 
-void* thread_function_1(void* arg) {
+void* thread_function_1(void* arg) { 
     Task* task = (Task*)arg;
     usleep(100000);
     snprintf(task->result, STR_LEN, "Thread %ld ran function 1 for task %d", pthread_self(), task->id);
