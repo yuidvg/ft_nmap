@@ -27,3 +27,5 @@
 .vm/result
 result
 *.nfs*
+thread_test
+pcap_test
