@@ -26,3 +26,4 @@
 *.qcow2
 .vm/result
 result
+*.nfs*

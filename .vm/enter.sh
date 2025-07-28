@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC2086
 nix-build '<nixpkgs/nixos>' \
           -A vm \
-          -I nixpkgs=channel:nixos-24.05 \
+          -I nixpkgs=channel:nixos-25.05 \
           -I nixos-config=./.vm/configuration.nix
 
 # Once the build completes successfully we can launch the VM.
