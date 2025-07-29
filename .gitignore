@@ -29,3 +29,4 @@ result
 *.nfs*
 thread_test
 pcap_test
+.direnv
