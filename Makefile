@@ -73,10 +73,18 @@ re: clean
 	$(MAKE) all
 
 vm-up:
-	./.vm/cluster2nix.sh --cmd "nix run .vm#vm"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		nix run github:YorikSar/nixos-vm-on-macos; \
+	else \
+		./.vm/cluster2nix.sh --cmd "nix run .vm#vm"; \
+	fi
 
 vm-down:
-	./.vm/cluster2nix.sh --cleanup
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		echo "VM cleanup not needed on macOS"; \
+	else \
+		./.vm/cluster2nix.sh --cleanup; \
+	fi
 
 vm-restart: vm-down vm-up
 
