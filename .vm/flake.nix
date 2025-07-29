@@ -115,6 +115,7 @@
           gcc
           gnumake
           libpcap
+          tcpdump
         ];
       };
 
