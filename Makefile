@@ -86,6 +86,7 @@ vm-down:
 		./.vm/cluster2nix.sh --cleanup; \
 	fi
 
+
 vm-restart: vm-down vm-up
 
 .PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell

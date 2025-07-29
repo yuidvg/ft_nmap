@@ -14,5 +14,6 @@ LDFLAGS = $(PCAP_LDFLAGS)
 $(TARGET): main.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) main.c
 
+
 clean:
 	rm -f $(TARGET)
