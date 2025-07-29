@@ -45,6 +45,7 @@
               gcc
               gnumake
               libpcap
+              tcpdump
             ];
 
             # Automatically log in as root on the console

@@ -12,3 +12,7 @@ Dynamic Work Queue: Each task is assigned to the first available thread
 Static Assignment thread: Each thread has a pre-assigned list of tasks
 
 A Dynamic Work Queue sounds better as long as we can ensure Safety
+
+It's apparently possible to do something like:
+    -When a worker is available, it checks if their is no one else currently listening, if not it checks if any message has been received and handle them
+    -If someone is already listening or if nothing was received, it just continues to the queue
