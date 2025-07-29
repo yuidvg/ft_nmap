@@ -93,7 +93,7 @@ vm-restart: vm-down vm-up
 
 # Debug
 $(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft
+	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft -lpcap
 $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
 
