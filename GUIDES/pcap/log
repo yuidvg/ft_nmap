@@ -1,0 +1,18 @@
+sudo tcpdump -i eth0 host 8.8.8.8
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+19:27:44.354492 IP nixos.rt-labtracker > dns.google.https: Flags [S], seq 0, win 1024, length 0
+19:27:44.356200 IP dns.google.https > nixos.rt-labtracker: Flags [S.], seq 50624001, ack 1, win 65535, options [mss 1460], length 0
+19:27:44.356216 IP nixos.rt-labtracker > dns.google.https: Flags [R], seq 1, win 0, length 0
+
+19:28:23.405557 IP nixos > dns.google: ICMP echo request, id 260, seq 0, length 8
+19:28:23.405566 IP nixos.45785 > dns.google.https: Flags [S], seq 1780905464, win 1024, options [mss 1460], length 0
+19:28:23.405569 IP nixos.45785 > dns.google.http: Flags [.], ack 1780905464, win 1024, length 0
+19:28:23.405571 IP nixos > dns.google: ICMP time stamp query id 3355 seq 0, length 20
+19:28:23.405690 IP dns.google.http > nixos.45785: Flags [R], seq 1780905464, win 0, length 0
+19:28:23.406942 IP dns.google.https > nixos.45785: Flags [S.], seq 55744001, ack 1780905465, win 65535, options [mss 1460], length 0
+19:28:23.406952 IP nixos.45785 > dns.google.https: Flags [R], seq 1780905465, win 0, length 0
+19:28:23.407014 IP dns.google > nixos: ICMP echo reply, id 260, seq 0, length 8
+19:28:23.415831 IP nixos.46041 > dns.google.https: Flags [S], seq 2212390666, win 1024, options [mss 1460], length 0
+19:28:23.417427 IP dns.google.https > nixos.46041: Flags [S.], seq 55808001, ack 2212390667, win 65535, options [mss 1460], length 0
+19:28:23.417435 IP nixos.46041 > dns.google.https: Flags [R], seq 2212390667, win 0, length 0

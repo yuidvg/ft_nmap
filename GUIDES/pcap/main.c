@@ -161,15 +161,8 @@ int main(int argc, char *argv[]) {
     // Calculate IP checksum
     iph->ip_sum = checksum((unsigned short *)packet, sizeof(struct ip));
 
-    // Send packet
-    if (sendto(sock, packet, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
-        perror("sendto failed");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-    printf("[*] SYN packet sent to %s:%d\n", target_ip, port);
-
     // Set up pcap
+/*
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = pcap_open_live(iface, 65536, 0, 3000, errbuf);
     if (!handle) {
@@ -177,13 +170,19 @@ int main(int argc, char *argv[]) {
         close(sock);
         exit(EXIT_FAILURE);
     }
-
+*/
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *handle = pcap_create(iface, errbuf);
+    pcap_set_snaplen(handle, 65536);
+    pcap_set_timeout(handle, 1);  // 1ms timeout
+    pcap_set_immediate_mode(handle, 1);
+    pcap_activate(handle);
     // Filter
     char filter_exp[128];
     //"tcp and src host %s and (tcp[13] & 0x14 != 0)"
     //"dst host <out> and (imcp or imcp6 or (tcp or upd or sctp) and (src host %s))"
 //    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x14 != 0)", target_ip); // SYN/ACK or RST
-    snprintf(filter_exp, sizeof(filter_exp), "src host %s", target_ip);
+    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x14 != 0)", target_ip);
     struct bpf_program fp;
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
         pcap_setfilter(handle, &fp) < 0) {
@@ -192,19 +191,21 @@ int main(int argc, char *argv[]) {
         close(sock);
         exit(EXIT_FAILURE);
     }
-    printf("1\n");
+    // Send packet - moved it down so that we would be better place to catch the answer directly (before the kernel)
+    if (sendto(sock, packet, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
+        perror("sendto failed");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+    printf("[*] SYN packet sent to %s:%d\n", target_ip, port);
     // Capture response
     struct pcap_pkthdr *header;
     const u_char *data;
     int result;
     time_t start = time(NULL);
-    printf("2\n");
     while (1) {
-        printf("2.5\n");
         result = pcap_next_ex(handle, &header, &data);
-        printf("3\n");
         if (result == 1) {
-            printf("test\n");
             struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
             struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
             if (rtcp->th_flags & TH_SYN && rtcp->th_flags & TH_ACK) {
