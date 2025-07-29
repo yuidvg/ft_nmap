@@ -1,47 +1,23 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <pcap.h>
-//#include <pcap/pcap.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netdb.h>
+#include <ifaddrs.h>
 #include <errno.h>
 #include <time.h>
 
-// IP and TCP header lengths
-#define IP4_HDRLEN 20
-#define TCP_HDRLEN 20
+#define PACKET_LEN 4096
 
-// Calculate checksum
-unsigned short checksum(unsigned short *ptr, int nbytes) {
-    long sum;
-    unsigned short oddbyte;
-    unsigned short answer;
-
-    sum = 0;
-    while (nbytes > 1) {
-        sum += *ptr++;
-        nbytes -= 2;
-    }
-
-    if (nbytes == 1) {
-        oddbyte = 0;
-        *((u_char *) &oddbyte) = *(u_char *) ptr;
-        sum += oddbyte;
-    }
-
-    sum = (sum >> 16) + (sum & 0xffff);
-    sum += (sum >> 16);
-    answer = (unsigned short) ~sum;
-
-    return answer;
-}
-
-// Pseudo-header for TCP checksum
+// IP and TCP headers
 struct pseudo_header {
     u_int32_t src;
     u_int32_t dst;
@@ -50,137 +26,176 @@ struct pseudo_header {
     u_int16_t tcp_length;
 };
 
-void build_tcp_syn_packet(char *packet, const char *src_ip, const char *dst_ip, int src_port, int dst_port) {
+// Checksum function
+unsigned short checksum(unsigned short *ptr, int nbytes) {
+    long sum = 0;
+    unsigned short oddbyte;
+    while (nbytes > 1) {
+        sum += *ptr++;
+        nbytes -= 2;
+    }
+    if (nbytes == 1) {
+        oddbyte = 0;
+        *((unsigned char*)&oddbyte) = *(unsigned char*)ptr;
+        sum += oddbyte;
+    }
+    sum = (sum >> 16) + (sum & 0xffff);
+    sum += (sum >> 16);
+    return (unsigned short)(~sum);
+}
+
+// Get the default interface and IP
+int get_local_ip_and_iface(char *iface, char *ip) {
+    struct ifaddrs *ifaddr, *ifa;
+    int family;
+    if (getifaddrs(&ifaddr) == -1) return -1;
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) continue;
+        family = ifa->ifa_addr->sa_family;
+        if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {
+            strcpy(iface, ifa->ifa_name);
+            getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
+            freeifaddrs(ifaddr);
+            return 0;
+        }
+    }
+    freeifaddrs(ifaddr);
+    return -1;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <target_ip> <port>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    char *target_ip = argv[1];
+    int port = atoi(argv[2]);
+
+    char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
+    if (get_local_ip_and_iface(iface, local_ip) != 0) {
+        perror("Could not determine local IP/interface");
+        exit(EXIT_FAILURE);
+    }
+    printf("[*] Using interface: %s (%s)\n", iface, local_ip);
+
+    // Raw socket
+    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set IP_HDRINCL
+    int one = 1;
+    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+        perror("Setting IP_HDRINCL");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    // Packet buffer
+    char packet[PACKET_LEN];
+    memset(packet, 0, PACKET_LEN);
+
     struct ip *iph = (struct ip *) packet;
-    struct tcphdr *tcph = (struct tcphdr *) (packet + IP4_HDRLEN);
+    struct tcphdr *tcph = (struct tcphdr *) (packet + sizeof(struct ip));
 
-    memset(packet, 0, IP4_HDRLEN + TCP_HDRLEN);
+    struct sockaddr_in dest;
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(port);
+    inet_pton(AF_INET, target_ip, &dest.sin_addr);
 
-    // IP header
+    // Fill IP header
     iph->ip_hl = 5;
     iph->ip_v = 4;
     iph->ip_tos = 0;
-    iph->ip_len = htons(IP4_HDRLEN + TCP_HDRLEN);
+    iph->ip_len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
     iph->ip_id = htons(rand() % 65535);
     iph->ip_off = 0;
     iph->ip_ttl = 64;
     iph->ip_p = IPPROTO_TCP;
     iph->ip_sum = 0;
-    iph->ip_src.s_addr = inet_addr(src_ip);
-    iph->ip_dst.s_addr = inet_addr(dst_ip);
-    iph->ip_sum = checksum((unsigned short *) iph, IP4_HDRLEN);
+    iph->ip_src.s_addr = inet_addr(local_ip);
+    iph->ip_dst = dest.sin_addr;
 
-    // TCP header
-    tcph->th_sport = htons(src_port);
-    tcph->th_dport = htons(dst_port);
-    tcph->th_seq = htonl(rand());
+    // Fill TCP header
+    tcph->th_sport = htons(rand() % 65535);
+    tcph->th_dport = htons(port);
+    tcph->th_seq = htonl(0);
+    tcph->th_ack = 0;
     tcph->th_off = 5;
     tcph->th_flags = TH_SYN;
-    tcph->th_win = htons(65535);
+    tcph->th_win = htons(1024);
     tcph->th_sum = 0;
+    tcph->th_urp = 0;
 
-    // Pseudo-header for checksum
+    // Calculate TCP checksum
     struct pseudo_header psh;
     psh.src = iph->ip_src.s_addr;
     psh.dst = iph->ip_dst.s_addr;
     psh.reserved = 0;
     psh.protocol = IPPROTO_TCP;
-    psh.tcp_length = htons(TCP_HDRLEN);
+    psh.tcp_length = htons(sizeof(struct tcphdr));
 
-    int psize = sizeof(struct pseudo_header) + TCP_HDRLEN;
-    char *pseudogram = malloc(psize);
-    memcpy(pseudogram, &psh, sizeof(struct pseudo_header));
-    memcpy(pseudogram + sizeof(struct pseudo_header), tcph, TCP_HDRLEN);
+    char pseudo_packet[PACKET_LEN];
+    memcpy(pseudo_packet, &psh, sizeof(psh));
+    memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));
+    tcph->th_sum = checksum((unsigned short *)pseudo_packet, sizeof(psh) + sizeof(struct tcphdr));
 
-    tcph->th_sum = checksum((unsigned short *) pseudogram, psize);
-    free(pseudogram);
-}
+    // Calculate IP checksum
+    iph->ip_sum = checksum((unsigned short *)packet, sizeof(struct ip));
 
-void send_syn_packet(const char *src_ip, const char *dst_ip, int src_port, int dst_port) {
-    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    if (sock < 0) {
-        perror("Raw socket");
-        exit(1);
+    // Send packet
+    if (sendto(sock, packet, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
+        perror("sendto failed");
+        close(sock);
+        exit(EXIT_FAILURE);
     }
+    printf("[*] SYN packet sent to %s:%d\n", target_ip, port);
 
-    int one = 1;
-    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-        perror("IP_HDRINCL");
-        exit(1);
-    }
-
-    char packet[IP4_HDRLEN + TCP_HDRLEN];
-    build_tcp_syn_packet(packet, src_ip, dst_ip, src_port, dst_port);
-
-    struct sockaddr_in dest;
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(dst_port);
-    dest.sin_addr.s_addr = inet_addr(dst_ip);
-
-    if (sendto(sock, packet, IP4_HDRLEN + TCP_HDRLEN, 0, (struct sockaddr *) &dest, sizeof(dest)) < 0) {
-        perror("sendto");
-        exit(1);
-    }
-
-    close(sock);
-}
-
-// libpcap packet handler
-void packet_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
-    struct ip *iph = (struct ip *)(bytes + 14);  // Ethernet header is 14 bytes
-    if (iph->ip_p != IPPROTO_TCP) return;
-
-    struct tcphdr *tcph = (struct tcphdr *) ((u_char *)iph + (iph->ip_hl * 4));
-
-    if (tcph->th_flags & TH_SYN && tcph->th_flags & TH_ACK) {
-        printf("Port %d is OPEN (SYN+ACK)\n", ntohs(tcph->th_sport));
-    } else if (tcph->th_flags & TH_RST) {
-        printf("Port %d is CLOSED (RST)\n", ntohs(tcph->th_sport));
-    }
-}
-
-void sniff_response(const char *filter_expr, const char *iface) {
+    // Set up pcap
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = pcap_open_live(iface, BUFSIZ, 0, 1000, errbuf);
+    pcap_t *handle = pcap_open_live(iface, 65536, 0, 1000, errbuf);
     if (!handle) {
-        fprintf(stderr, "pcap_open_live failed: %s\n", errbuf);
-        exit(1);
+        fprintf(stderr, "pcap_open_live() failed: %s\n", errbuf);
+        close(sock);
+        exit(EXIT_FAILURE);
     }
 
+    // Filter
+    char filter_exp[128];
+    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x12 != 0)", target_ip); // SYN/ACK or RST
     struct bpf_program fp;
-    if (pcap_compile(handle, &fp, filter_expr, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-        fprintf(stderr, "pcap_compile error\n");
-        exit(1);
-    }
-    if (pcap_setfilter(handle, &fp) == -1) {
-        fprintf(stderr, "pcap_setfilter error\n");
-        exit(1);
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
+        pcap_setfilter(handle, &fp) < 0) {
+        fprintf(stderr, "pcap filter error\n");
+        pcap_close(handle);
+        close(sock);
+        exit(EXIT_FAILURE);
     }
 
-    printf("Listening for replies...\n");
-    pcap_dispatch(handle, 10, packet_handler, NULL);
+    // Capture response
+    struct pcap_pkthdr *header;
+    const u_char *data;
+    int result;
+    time_t start = time(NULL);
+    while ((time(NULL) - start) < 5) {
+        result = pcap_next_ex(handle, &header, &data);
+        if (result == 1) {
+            struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
+            struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
+            if (rtcp->th_flags & TH_SYN && rtcp->th_flags & TH_ACK) {
+                printf("[+] Port %d is OPEN (SYN+ACK)\n", port);
+                break;
+            } else if (rtcp->th_flags & TH_RST) {
+                printf("[-] Port %d is CLOSED (RST)\n", port);
+                break;
+            }
+        }
+    }
+
     pcap_close(handle);
-}
-
-int main(int argc, char *argv[]) {
-    if (argc != 5) {
-        printf("Usage: %s <interface> <source_ip> <target_ip> <port>\n", argv[0]);
-        return 1;
-    }
-
-    srand(time(NULL));
-    const char *iface = argv[1];
-    const char *src_ip = argv[2];
-    const char *dst_ip = argv[3];
-    int dst_port = atoi(argv[4]);
-    int src_port = 54321;
-
-    send_syn_packet(src_ip, dst_ip, src_port, dst_port);
-
-    char filter[128];
-    snprintf(filter, sizeof(filter), "tcp and src host %s and dst port %d", dst_ip, src_port);
-
-    sniff_response(filter, iface);
-
+    close(sock);
     return 0;
 }
