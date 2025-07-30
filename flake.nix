@@ -1,5 +1,5 @@
 {
-  description = "Dev shell for SYN scanner";
+  description = "Dev shell ft_nmap";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05"; # or your preferred version
 
@@ -8,6 +8,8 @@
       buildInputs = [
         nixpkgs.pkgs.libpcap
         nixpkgs.pkgs.gcc
+        nixpkgs.pkgs.libpcap
+        nixpkgs.pkgs.nmap
       ];
     };
   };
