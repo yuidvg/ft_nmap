@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/select.h>
 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -71,38 +72,50 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <target_ip> <port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+// ... existing code up to line 77 ...
 
-    char *target_ip = argv[1];
-    int port = atoi(argv[2]);
+const char *const target_ip = argv[1];
+const int base_port = atoi(argv[2]);
 
-    char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
-    if (get_local_ip_and_iface(iface, local_ip) != 0) {
-        perror("Could not determine local IP/interface");
-        exit(EXIT_FAILURE);
-    }
-    printf("[*] Using interface: %s (%s)\n", iface, local_ip);
+char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
+if (get_local_ip_and_iface(iface, local_ip) != 0) {
+    perror("Could not determine local IP/interface");
+    exit(EXIT_FAILURE);
+}
+printf("[*] Using interface: %s (%s)\n", iface, local_ip);
 
-    // Raw socket
-    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-    if (sock < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+// Raw socket
+const int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+if (sock < 0) {
+    perror("Socket creation failed");
+    exit(EXIT_FAILURE);
+}
 
-    // Set IP_HDRINCL
-    int one = 1;
-    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-        perror("Setting IP_HDRINCL");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
+// Set IP_HDRINCL
+const int one = 1;
+if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+    perror("Setting IP_HDRINCL");
+    close(sock);
+    exit(EXIT_FAILURE);
+}
+
+    // Set up pcap once
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *const handle = pcap_create(iface, errbuf);
+    pcap_set_snaplen(handle, 65536);
+    pcap_set_timeout(handle, 100);  // 100ms timeout
+    pcap_set_immediate_mode(handle, 1);
+    pcap_activate(handle);
+
+for (int i = 0; i < 10; ++i) {
+    const int port = base_port + i;
 
     // Packet buffer
     char packet[PACKET_LEN];
     memset(packet, 0, PACKET_LEN);
 
-    struct ip *iph = (struct ip *) packet;
-    struct tcphdr *tcph = (struct tcphdr *) (packet + sizeof(struct ip));
+    struct ip *const iph = (struct ip *) packet;
+    struct tcphdr *const tcph = (struct tcphdr *) (packet + sizeof(struct ip));
 
     struct sockaddr_in dest;
     dest.sin_family = AF_INET;
@@ -139,9 +152,7 @@ int main(int argc, char *argv[]) {
     psh.dst = iph->ip_dst.s_addr;
     psh.reserved = 0;
     psh.protocol = IPPROTO_TCP;
-
-    // TCP checksum
-    int tcp_len = sizeof(struct tcphdr);
+    const int tcp_len = sizeof(struct tcphdr);
     psh.tcp_length = htons(tcp_len);
 
     char pseudo_packet[PACKET_LEN];
@@ -151,40 +162,11 @@ int main(int argc, char *argv[]) {
     tcph->th_sum = 0;
     tcph->th_sum = checksum((unsigned short *)pseudo_packet, sizeof(psh) + tcp_len);
 
-    /*
-    psh.tcp_length = htons(sizeof(struct tcphdr));
-
-    char pseudo_packet[PACKET_LEN];
-    memset(pseudo_packet, 0, PACKET_LEN);
-    memcpy(pseudo_packet, &psh, sizeof(psh));
-    memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));
-    tcph->th_sum = checksum((unsigned short *)pseudo_packet, sizeof(psh) + sizeof(struct tcphdr));
-    */
-
     // Calculate IP checksum
     iph->ip_sum = checksum((unsigned short *)packet, sizeof(struct ip));
 
-    // Set up pcap
-/*
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = pcap_open_live(iface, 65536, 0, 3000, errbuf);
-    if (!handle) {
-        fprintf(stderr, "pcap_open_live() failed: %s\n", errbuf);
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-*/
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = pcap_create(iface, errbuf);
-    pcap_set_snaplen(handle, 65536);
-    pcap_set_timeout(handle, 100);  // 100ms timeout
-    pcap_set_immediate_mode(handle, 1);
-    pcap_activate(handle);
-    // Filter
+    // Set up filter for this port
     char filter_exp[128];
-    //"tcp and src host %s and (tcp[13] & 0x14 != 0)"
-    //"dst host <out> and (imcp or imcp6 or (tcp or upd or sctp) and (src host %s))"
-//    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x14 != 0)", target_ip); // SYN/ACK or RST
     snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and dst port %d and (tcp[13] & 0x14 != 0)", target_ip, ntohs(tcph->th_sport));
     struct bpf_program fp;
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
@@ -194,34 +176,79 @@ int main(int argc, char *argv[]) {
         close(sock);
         exit(EXIT_FAILURE);
     }
-    // Send packet - moved it down so that we would be better place to catch the answer directly (before the kernel)
+
+    // Send packet
     if (sendto(sock, packet, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
         perror("sendto failed");
         close(sock);
+        pcap_close(handle);
         exit(EXIT_FAILURE);
     }
     printf("[*] SYN packet sent to %s:%d\n", target_ip, port);
+
     // Capture response
     struct pcap_pkthdr *header;
     const u_char *data;
     int result;
     time_t start = time(NULL);
-    while (1) {
-        result = pcap_next_ex(handle, &header, &data);
-        if (result == 1) {
-            struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
-            struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
-            if (rtcp->th_flags & TH_SYN && rtcp->th_flags & TH_ACK) {
-                printf("[+] Port %d is OPEN (SYN+ACK)\n", port);
-                break;
-            } else if (rtcp->th_flags & TH_RST) {
-                printf("[-] Port %d is CLOSED (RST)\n", port);
+    int found = 0;
+    
+    // Get pcap file descriptor for select
+    const int pcap_fd = pcap_get_selectable_fd(handle);
+    
+    while (time(NULL) - start < 2) { // 2 second timeout per port
+        fd_set read_fds;
+        struct timeval timeout;
+        
+        FD_ZERO(&read_fds);
+        FD_SET(pcap_fd, &read_fds);
+        
+        // Calculate remaining time
+        const time_t elapsed = time(NULL) - start;
+        const time_t remaining = 2 - elapsed;
+        if (remaining <= 0) break;
+        
+        timeout.tv_sec = remaining;
+        timeout.tv_usec = 0;
+        
+        // Use select to wait for data with timeout
+        const int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout);
+        
+        if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) {
+            // Data available, try to read it
+            result = pcap_next_ex(handle, &header, &data);
+            if (result == 1) {
+                struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
+                struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
+                if (rtcp->th_flags & TH_SYN && rtcp->th_flags & TH_ACK) {
+                    printf("[+] Port %d is OPEN (SYN+ACK)\n", port);
+                    found = 1;
+                    break;
+                } else if (rtcp->th_flags & TH_RST) {
+                    printf("[-] Port %d is CLOSED (RST)\n", port);
+                    found = 1;
+                    break;
+                }
+            } else if (result == -1) {
+                // Error occurred
+                fprintf(stderr, "Error reading packet: %s\n", pcap_geterr(handle));
                 break;
             }
+        } else if (select_result == 0) {
+            // Timeout occurred
+            break;
+        } else if (select_result < 0) {
+            // Select error
+            perror("select() failed");
+            break;
         }
     }
+    if (!found) {
+        printf("[?] Port %d is FILTERED or no response\n", port);
+    }
+}
 
-    pcap_close(handle);
-    close(sock);
-    return 0;
+pcap_close(handle);
+close(sock);
+return 0;
 }
