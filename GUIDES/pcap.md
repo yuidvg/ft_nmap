@@ -32,3 +32,11 @@ sudo ./pcap_test 8.8.8.8 443                //roughly equivalent to: sudo nmap -
 
 # tcpdump
 sudo tcpdump -i eth0 host 8.8.8.8           //listens to everything related to that address on that interface. Useful to compare the packets sent and received by nmap and our program
+
+# non immediate mode
+Pros of non-immediate mode:
+    Better performance: Fewer context switches and syscalls.
+    Good for high-throughput scenarios where latency isn’t critical.
+Cons:
+    Higher latency: You might not get packets for up to the timeout delay.
+    Poor responsiveness: If you're building a real-time or interactive tool, this can be a problem.

@@ -1,21 +1,22 @@
+// Standard libc
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <sys/select.h>
-
+// Posix stuff, not libc but pretty necessary. Still fits the spirit of the rule since it's portable
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <net/if.h>
 #include <netdb.h>
 #include <ifaddrs.h>
-
+// External libraries
 #include <pcap.h>
 
 #define PACKET_LEN 4096
@@ -56,10 +57,10 @@ int get_local_ip_and_iface(char *iface, char *ip) {
         if (ifa->ifa_addr == NULL) continue;                            //skip an interface if it doesn't have an address
         family = ifa->ifa_addr->sa_family;                              //check if the address is ipv4, ipv6, etc...
         if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {  //select one that's ipv4, excluding the loopback interface
-            //stors the ip and interface in iface and ip (after).
+            //stores the ip and interface in iface and ip (after).
             strcpy(iface, ifa->ifa_name);
             getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
-            freeifaddrs(ifaddr);//free the result of getifaddrs()//NEED to check that the free was successful
+            freeifaddrs(ifaddr);                                        //free the result of getifaddrs()//NEED to check that the free was successful
             return 0;
         }
     }
@@ -68,46 +69,62 @@ int get_local_ip_and_iface(char *iface, char *ip) {
 }
 
 int main(int argc, char *argv[]) {
+// PARSING
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <target_ip> <port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-// ... existing code up to line 77 ...
+    const char *const target_ip = argv[1];
+    const int base_port = atoi(argv[2]);
 
-const char *const target_ip = argv[1];
-const int base_port = atoi(argv[2]);
+// SETUP
+    // Retrieve the interface and ip we will use
+    char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
+    if (get_local_ip_and_iface(iface, local_ip) != 0) {
+        perror("Could not determine local IP/interface");
+        exit(EXIT_FAILURE);
+    }
+    printf("[*] Using interface: %s (%s)\n", iface, local_ip);
 
-char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
-if (get_local_ip_and_iface(iface, local_ip) != 0) {
-    perror("Could not determine local IP/interface");
-    exit(EXIT_FAILURE);
-}
-printf("[*] Using interface: %s (%s)\n", iface, local_ip);
+    // Create the raw socket
+    const int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);// returns a file descriptor
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
 
-// Raw socket
-const int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-if (sock < 0) {
-    perror("Socket creation failed");
-    exit(EXIT_FAILURE);
-}
+    // Set IP_HDRINCL which tells the kernel not to add an header (since we do it ourselves)
+    const int one = 1;
+    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+    //            (fd  , protocol  , option    , value, size      )
+        perror("Error setting IP_HDRINCL");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
 
-// Set IP_HDRINCL
-const int one = 1;
-if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-    perror("Setting IP_HDRINCL");
-    close(sock);
-    exit(EXIT_FAILURE);
-}
+    // Set up pcap
+    char errbuf[PCAP_ERRBUF_SIZE];                      // will store pcap errors
+    pcap_t *const handle = pcap_create(iface, errbuf);  // create a pcap capture handle (takes the interface and the error buffer)
+    //pcap_set_snaplen(handle, 65536);                  // set the max len of the packets. Good to set but the default is usually the same
+    //pcap_set_timeout(handle, 100); for now redundant, because we're in immediate mode and we handle the timeouts later in the code
+    pcap_set_immediate_mode(handle, 1);                 // set the immediate mode. NEED TO LOOK AT LATER TO DECIDE WHICH IS BETTER
+    pcap_activate(handle);                              // applies settings & activates the capture
 
-    // Set up pcap once
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *const handle = pcap_create(iface, errbuf);
-    pcap_set_snaplen(handle, 65536);
-    pcap_set_timeout(handle, 100);  // 100ms timeout
-    pcap_set_immediate_mode(handle, 1);
-    pcap_activate(handle);
 
-    // Phase 1: Send all SYN packets first
+// SET UP PCAP FILTER
+    char filter_exp[256];
+    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s", target_ip); // simple filter, good enough for now but ideally it would be more specific
+    printf("[*] Using filter: %s\n", filter_exp);
+    struct bpf_program fp;
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
+        pcap_setfilter(handle, &fp) < 0) {
+        fprintf(stderr, "pcap filter error\n");
+        pcap_close(handle);
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+// SENDING THE PACKETS
     printf("[*] Sending SYN packets to ports %d-%d...\n", base_port, base_port + 9);
     
     for (int i = 0; i < 10; ++i) {
@@ -180,21 +197,7 @@ if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         printf("[*] SYN packet sent to %s:%d\n", target_ip, port);
     }
 
-    // Phase 2: Set up pcap filter for all responses
-    char filter_exp[256];
-    snprintf(filter_exp, sizeof(filter_exp), 
-             "tcp and src host %s", target_ip);  // Simplified filter - just capture all TCP from target
-    printf("[*] Using filter: %s\n", filter_exp);
-    struct bpf_program fp;
-    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
-        pcap_setfilter(handle, &fp) < 0) {
-        fprintf(stderr, "pcap filter error\n");
-        pcap_close(handle);
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-
-    // Phase 3: Listen for all responses
+// LISTEN FOR RESPONSES
     printf("[*] Listening for responses...\n\n");
     
     // Track which ports we've received responses for
@@ -274,8 +277,6 @@ if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
             break;
         }
     }
-
-    // Phase 4: Report ports that didn't respond
     printf("[*] Scan complete. Reporting filtered ports:\n");
     for (int i = 0; i < 10; ++i) {
         if (!responses_received[i]) {
@@ -283,7 +284,7 @@ if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         }
     }
 
-pcap_close(handle);
-close(sock);
-return 0;
+    pcap_close(handle);
+    close(sock);
+    return 0;
 }
