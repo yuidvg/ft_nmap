@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <pcap.h>
+#include <errno.h>
+#include <time.h>
+
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -12,8 +14,8 @@
 #include <net/if.h>
 #include <netdb.h>
 #include <ifaddrs.h>
-#include <errno.h>
-#include <time.h>
+
+#include <pcap.h>
 
 #define PACKET_LEN 4096
 
@@ -26,7 +28,7 @@ struct pseudo_header {
     u_int16_t tcp_length;
 };
 
-// Checksum function
+// Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
     long sum = 0;
     unsigned short oddbyte;
@@ -48,14 +50,15 @@ unsigned short checksum(unsigned short *ptr, int nbytes) {
 int get_local_ip_and_iface(char *iface, char *ip) {
     struct ifaddrs *ifaddr, *ifa;
     int family;
-    if (getifaddrs(&ifaddr) == -1) return -1;
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) continue;
-        family = ifa->ifa_addr->sa_family;
-        if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {
+    if (getifaddrs(&ifaddr) == -1) return -1;                           //if it succeeds, ifaddr is populated with a list of the interfaces
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {              //loops through the interfaces list
+        if (ifa->ifa_addr == NULL) continue;                            //skip an interface if it doesn't have an address
+        family = ifa->ifa_addr->sa_family;                              //check if the address is ipv4, ipv6, etc...
+        if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {  //select one that's ipv4, excluding the loopback interface
+            //stors the ip and interface in iface and ip (after).
             strcpy(iface, ifa->ifa_name);
             getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
-            freeifaddrs(ifaddr);
+            freeifaddrs(ifaddr);//free the result of getifaddrs()//NEED to check that the free was successful
             return 0;
         }
     }
@@ -174,7 +177,7 @@ int main(int argc, char *argv[]) {
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = pcap_create(iface, errbuf);
     pcap_set_snaplen(handle, 65536);
-    pcap_set_timeout(handle, 1);  // 1ms timeout
+    pcap_set_timeout(handle, 100);  // 100ms timeout
     pcap_set_immediate_mode(handle, 1);
     pcap_activate(handle);
     // Filter
@@ -182,7 +185,7 @@ int main(int argc, char *argv[]) {
     //"tcp and src host %s and (tcp[13] & 0x14 != 0)"
     //"dst host <out> and (imcp or imcp6 or (tcp or upd or sctp) and (src host %s))"
 //    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x14 != 0)", target_ip); // SYN/ACK or RST
-    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and (tcp[13] & 0x14 != 0)", target_ip);
+    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s and dst port %d and (tcp[13] & 0x14 != 0)", target_ip, ntohs(tcph->th_sport));
     struct bpf_program fp;
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
         pcap_setfilter(handle, &fp) < 0) {
