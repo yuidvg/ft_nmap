@@ -35,7 +35,7 @@ FQDN = Fully qualified domain name, like https://www.google.com
     Then
     --ports = u_int16_t[1024]. Stores each port that needs to be scanned
     --ip = string? --file = malloc for a string[]
-    --speedrup = u_int8_t
+    --speedup = u_int8_t
     --scan = bool[6]
 
 # Threads management

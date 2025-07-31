@@ -6,14 +6,17 @@
 
 #define STR_LEN   128
 
-typedef struct {
+typedef struct Task {
     int id;
     void* (*function)(void*);
-    char result[STR_LEN];  // result buffer inside the task struct
+    char result[STR_LEN];
+
+    struct Task* next;  // Linked list pointer
 } Task;
 
+
 typedef struct {
-    Task* tasks;
+    Task* head;
 
     int num_tasks;
     int num_threads;
@@ -27,6 +30,7 @@ void* thread_function_1(void* arg) {
     Task* task = (Task*)arg;
     usleep(100000);
     snprintf(task->result, STR_LEN, "Thread %ld ran function 1 for task %d", pthread_self(), task->id);
+    printf("%s\n", task->result);
     usleep(100000);
     return NULL;
 }
@@ -49,21 +53,25 @@ void* worker(void* arg) {
     TaskManager* manager = (TaskManager*)arg;
 
     while (1) {
-        Task* task_ptr = NULL;
-
         pthread_mutex_lock(&manager->queue_mutex);
-        if (manager->task_index >= manager->num_tasks) {
+
+        Task* task = manager->head;
+        if (!task) {
             pthread_mutex_unlock(&manager->queue_mutex);
             break;
         }
-        task_ptr = &manager->tasks[manager->task_index++];
+
+        // Remove from list
+        manager->head = task->next;
+
         pthread_mutex_unlock(&manager->queue_mutex);
 
-        task_ptr->function(task_ptr);
+        task->function(task);  // do the task
     }
 
     return NULL;
 }
+
 
 //Needs better error management
 int main(int argc, char* argv[]) {
@@ -86,19 +94,31 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    manager.tasks = malloc(manager.num_tasks * sizeof(Task));
-    if (!manager.tasks) {
-        perror("Memory allocation failed");
-        return 1;
-    }
+    Task* prev = NULL;
 
     for (int i = 0; i < manager.num_tasks; ++i) {
-        manager.tasks[i].id = i;
-        manager.tasks[i].function = (i % 3 == 0) ? thread_function_1 :
-                                   (i % 3 == 1) ? thread_function_2 :
-                                                  thread_function_3;
-        memset(manager.tasks[i].result, 0, STR_LEN);
+        Task* task = malloc(sizeof(Task));
+        if (!task) {
+            perror("malloc");
+            return 1;
+        }
+
+        task->id = i;
+        task->function = (i % 3 == 0) ? thread_function_1 :
+                        (i % 3 == 1) ? thread_function_2 :
+                                    thread_function_3;
+        memset(task->result, 0, STR_LEN);
+        task->next = NULL;
+
+        if (prev) {
+            prev->next = task;
+        } else {
+            manager.head = task;
+        }
+
+        prev = task;
     }
+
 
     // Start the workers
     pthread_mutex_init(&manager.queue_mutex, NULL);
@@ -106,7 +126,7 @@ int main(int argc, char* argv[]) {
     pthread_t* threads = malloc(manager.num_threads * sizeof(pthread_t));
     if (!threads) {
         perror("Memory allocation for threads failed");
-        free(manager.tasks);
+        free(manager.head);//do cleanly
         return 1;
     }
 
@@ -126,12 +146,18 @@ int main(int argc, char* argv[]) {
     }
 
     // Print the results
-    printf("\n--- Results ---\n");
-    for (int i = 0; i < manager.num_tasks; ++i) {
-        printf("%s\n", manager.tasks[i].result);
+    Task* current = manager.head;
+    while (current) {
+        printf("Task %d: %s\n", current->id, current->result);
+        current = current->next;
+    }
+    current = manager.head;
+    while (current) {
+        Task* next = current->next;
+        free(current);
+        current = next;
     }
 
-    free(manager.tasks);
     free(threads);
 
     pthread_mutex_destroy(&manager.queue_mutex);

@@ -3,7 +3,12 @@ HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
 CC = gcc
-CFLAGS_COMMON = -Wall -Wextra -Werror
+
+PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
+PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
+PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
+
+CFLAGS_COMMON = -Wall -Wextra -Werror $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
 CFLAGS_DEBUG = -g -O0
 CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
@@ -32,7 +37,7 @@ TEST_DIR = test
 TEST_SRC = $(TEST_DIR)/test.c $(TEST_DIR)/munit.c
 
 # App
-APP_BIN = $(BIN_DIR)/ #insert here
+APP_BIN = $(BIN_DIR)/ft_nmap
 APP_INCLUDE = include
 
 APP_OBJ_DIR = $(OBJ_DIR)/src
@@ -51,7 +56,7 @@ LIBFT_SRC = $(wildcard $(LIBFT_DIR)/*.c)
 #-----------------------------------------------------------------------------------------------------------#
 # Rules
 #-----------------------------------------------------------------------------------------------------------#
-all:  $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
+all: $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
 
 app: $(APP_BIN)
 
@@ -93,19 +98,19 @@ vm-restart: vm-down vm-up
 
 # Debug
 $(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft
+	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft -lpcap
 $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
 
 # Tests
 $(TEST_BIN): $(TEST_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(TEST_OBJ) -L$(LIBFT_DIR) -lft
+	$(CC) $(CFLAGS) -o $@ $(TEST_OBJ) -L$(LIBFT_DIR) -lft -lpcap
 $(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
 
 # App
 $(APP_BIN): $(LIBFT_BIN) $(APP_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(APP_OBJ) -L$(LIBFT_DIR) -lft
+	$(CC) $(CFLAGS) -o $@ $(APP_OBJ) -L$(LIBFT_DIR) -lft -lpcap
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
 	$(CC) $(CFLAGS) -I$(APP_INCLUDE) -I$(LIBFT_INCLUDE) -c $< -o $@
 
