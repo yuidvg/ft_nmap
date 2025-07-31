@@ -165,7 +165,7 @@ bool is_size_overflowed(const size_t size)
 2. `const` **everywhere** (rare, scoped exceptions allowed).
 3. **Never** re-assign an existing identifier.
 4. Pass **all** data via parameters.
-5. Wrap **all** side-effects in `Result…` structs.
+5. Wrap **all** side-effects in `result_t…` structs.
 6. Follow the **function skeleton** format.
 7. snake_case
 8. **Single exit point**: express flow with `if / else if / else`, no early returns.
