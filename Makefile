@@ -5,7 +5,14 @@ endif
 CC = gcc
 CFLAGS_COMMON = -Wall -Wextra -Werror
 CFLAGS_DEBUG = -g -O0
-CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
+PCAP_CFLAGS  := $(shell pkg-config --cflags   libpcap)
+PCAP_LDFLAGS := $(shell pkg-config --libs     libpcap)
+PTHREAD_CFLAGS := $(shell pkg-config --cflags   pthread)
+PTHREAD_LDFLAGS := $(shell pkg-config --libs     pthread)
+LIBRARIES_CFLAGS = $(PCAP_CFLAGS) $(PTHREAD_CFLAGS)
+LIBRARIES_LDFLAGS = $(PCAP_LDFLAGS) $(PTHREAD_LDFLAGS)
+LDFLAGS = $(LIBRARIES_LDFLAGS)
+CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG) $(LIBRARIES_CFLAGS)
 MAKE = make
 
 # Build Directories
@@ -32,7 +39,7 @@ TEST_DIR = test
 TEST_SRC = $(TEST_DIR)/test.c $(TEST_DIR)/munit.c
 
 # App
-APP_BIN = $(BIN_DIR)/ #insert here
+APP_BIN = $(BIN_DIR)/ft_nmap
 APP_INCLUDE = include
 
 APP_OBJ_DIR = $(OBJ_DIR)/src
@@ -41,12 +48,9 @@ APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
 APP_DIR = src
 APP_SRC = $(wildcard $(APP_DIR)/*.c)
 
-# Libft
-LIBFT_DIR = libft
-LIBFT_BIN = $(LIBFT_DIR)/libft.a
-LIBFT_INCLUDE = $(LIBFT_DIR)/include
-LIBFT_SRC = $(wildcard $(LIBFT_DIR)/*.c)
-
+# All
+ALL_OBJ = $(DEBUG_OBJ) $(TEST_OBJ) $(APP_OBJ)
+ALL_BIN = $(DEBUG_BIN) $(TEST_BIN) $(APP_BIN)
 
 #-----------------------------------------------------------------------------------------------------------#
 # Rules
@@ -66,8 +70,7 @@ debug-test: $(TEST_BIN)
 	gdb $(TEST_BIN)
 
 clean:
-	rm -rf $(DEBUG_BIN) $(DEBUG_OBJ) $(TEST_BIN) $(TEST_OBJ) $(APP_BIN) $(APP_OBJ)
-	$(MAKE) -C $(LIBFT_DIR) fclean
+	rm -rf $(ALL_BIN) $(ALL_OBJ)
 
 re: clean
 	$(MAKE) all
@@ -93,24 +96,20 @@ vm-restart: vm-down vm-up
 
 # Debug
 $(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft -lpcap
+	$(CC) $(LDFLAGS) -o $@ $(DEBUG_OBJ)
 $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
 
 # Tests
 $(TEST_BIN): $(TEST_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(TEST_OBJ) -L$(LIBFT_DIR) -lft
+	$(CC) $(LDFLAGS) -o $@ $(TEST_OBJ)
 $(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
 
 # App
-$(APP_BIN): $(LIBFT_BIN) $(APP_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(APP_OBJ) -L$(LIBFT_DIR) -lft
+$(APP_BIN): $(APP_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $(APP_OBJ)
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
-	$(CC) $(CFLAGS) -I$(APP_INCLUDE) -I$(LIBFT_INCLUDE) -c $< -o $@
-
-# Libft
-$(LIBFT_BIN):
-	$(MAKE) -C $(LIBFT_DIR)
+	$(CC) $(CFLAGS) -I$(APP_INCLUDE) -c $< -o $@
 
 #-----------------------------------------------------------------------------------------------------------#

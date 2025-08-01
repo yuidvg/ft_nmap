@@ -11,7 +11,7 @@
 
   outputs = { self, nixpkgs, nixos-vscode-server }:
     let
-      system = "x86_64-linux";
+      system = "aarch64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in
     {
@@ -52,7 +52,7 @@
             services.getty.autologinUser = "root";
 
             virtualisation.sharedDirectories = {
-              workspace = {                 
+              workspace = {
                 source = "/workspace";
                 target = "/workspace";
               };
@@ -138,4 +138,4 @@
         default = self.apps.${system}.vm;
       };
     };
-} 
+}

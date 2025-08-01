@@ -1,31 +1,28 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/debian
+// README at: https://github.com/devcontainers/templates/tree/main/src/cpp
 {
-	"name": "c-dev-container",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:debian",
+	"name": "C++",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
-		"ghcr.io/devcontainers/features/nix:1": {}
+		"ghcr.io/devcontainers/features/nix": {
+			"extraNixConfig": "experimental-features = nix-command flakes"
+		}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-	// // Configure tool-specific properties.
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-vscode.cpptools",
-				"ms-vscode.makefile-tools"
-			]
-		},
-		"cursor": {
-			"extensions": [
-				"ms-vscode.cpptools",
-				"ms-vscode.makefile-tools"
-			]
-		}
-	},
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": [
+		//・vscode・ユーザで・nix-direnv・を追加
+		"nix profile install nixpkgs#nix-direnv nixpkgs#direnv",
+		//・Zsh・に・hook・を設定（重複しないよう・grep・で確認）
+		"grep -qxF 'eval \"$(direnv hook zsh)\"* ~/.zshrc || echo 'eval-\"$(direnv hook zsh)\"* >> ~/ zshrc"
+	]
+	//
+	// Configure tool-specific properties.
+	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	"remoteUser": "root",
-	"postCreateCommand": "apt update && apt install -y valgrind gdb direnv"
+	// "remoteUser": "root"
 }

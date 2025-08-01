@@ -1,16 +1,22 @@
 {
-  description = "Dev shell ft_nmap";
+  description = "ft_nmap development environment";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05"; # or your preferred version
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
-  outputs = { self, nixpkgs }: {
-    devShells.default = nixpkgs.lib.mkShell {
-      buildInputs = [
-        nixpkgs.pkgs.libpcap
-        nixpkgs.pkgs.gcc
-        nixpkgs.pkgs.libpcap
-        nixpkgs.pkgs.nmap
+  outputs = { self, nixpkgs }:
+    let
+      supportedSystems = [
+        "x86_64-linux" "aarch64-linux"
+        "aarch64-darwin"
       ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    in {
+      devShells = forAllSystems (system: let
+        pkgs = import nixpkgs { inherit system; };
+      in {
+        default = pkgs.mkShell {
+          buildInputs = with pkgs; [ nmap libpcap gcc pkg-config ];
+        };
+      });
     };
-  };
 }
