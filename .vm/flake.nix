@@ -9,9 +9,14 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixos-vscode-server }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nixos-vscode-server,
+    }:
     let
-      system = "x86_64-linux";
+      system = "aarch64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in
     {
@@ -19,7 +24,11 @@
       nixosConfigurations.vm = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          "${nixpkgs}/nixos/modules/virtualisation/qemu-vm.nix"
+          self.nixosModules.base
+          self.nixosModules.vm
+          {
+            virtualisation.vmVariant.virtualisation.host.pkgs = nixpkgs.legacyPackages.aarch64-darwin;
+          }
           nixos-vscode-server.nixosModules.default
           {
             boot.loader.systemd-boot.enable = true;
@@ -39,7 +48,11 @@
             virtualisation = {
               # Forward host port 2222 → guest port 22 (SSH)
               forwardPorts = [
-                { from = "host"; host.port = 2222; guest.port = 22; }
+                {
+                  from = "host";
+                  host.port = 2222;
+                  guest.port = 22;
+                }
               ];
               memorySize = 4096;
               sharedDirectories = {
@@ -51,8 +64,8 @@
             };
 
             fileSystems."/workspace" = {
-              device  = "workspace";
-              fsType  = "9p";
+              device = "workspace";
+              fsType = "9p";
               options = "trans=virtio,version=9p2000.L,rw,cache=mmap,uid=1000,gid=100,fmode=0644,dmode=0755";
               neededForBoot = true;
             };
@@ -74,18 +87,18 @@
 
             environment = {
               systemPackages = with pkgs; [
-              nmap
-              nodejs_20
-              vim
-              gcc
-              gnumake
-              libpcap
-              tcpdump
-              gdb
-              valgrind
-              direnv
-              pkg-config
-            ];
+                nmap
+                nodejs_20
+                vim
+                gcc
+                gnumake
+                libpcap
+                tcpdump
+                gdb
+                valgrind
+                direnv
+                pkg-config
+              ];
 
               # Change directory to /workspace on login
               loginShellInit = "cd /workspace";
@@ -99,8 +112,8 @@
             # Enable OpenSSH server so the host can connect into the VM
             services.openssh = {
               enable = true;
-              passwordAuthentication = true;  # allow passwords
-              permitRootLogin = "yes";       # root allowed
+              passwordAuthentication = true; # allow passwords
+              permitRootLogin = "yes"; # root allowed
               settings = {
                 PermitEmptyPasswords = "yes"; # accept empty passwords (very insecure)
               };
@@ -119,7 +132,10 @@
             # Allow running generic dynamically-linked binaries (e.g., bundled NodeJS)
             programs.nix-ld.enable = true;
             # Enable Nix flakes and nix-command inside the VM
-            nix.settings.experimental-features = [ "nix-command" "flakes" ];
+            nix.settings.experimental-features = [
+              "nix-command"
+              "flakes"
+            ];
 
             system.stateVersion = "24.05";
           }
@@ -145,6 +161,7 @@
         vm = self.nixosConfigurations.vm.config.system.build.vm;
         default = self.packages.${system}.vm;
       };
+      packages.aarch64-darwin.darwinVM = self.nixosConfigurations.darwinVM.config.system.build.vm;
 
       # Apps for running the VM
       apps.${system} = {
@@ -158,4 +175,4 @@
         default = self.apps.${system}.vm;
       };
     };
-} 
+}
