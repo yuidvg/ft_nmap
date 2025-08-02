@@ -109,7 +109,7 @@ re: clean
 
 vm-up:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
-		.vm/cluster2nix.sh --cmd "nix run --impure .#vm"; \
+		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
 	else \
 		nix run --impure .#vm; \
 	fi
