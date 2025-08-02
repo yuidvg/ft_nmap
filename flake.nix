@@ -11,12 +11,23 @@
       nixpkgs,
       nixos-vscode-server,
     }:
+    let
+      hostSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+    in
     {
       nixosModules = {
         base =
           { pkgs, ... }:
           {
             system.stateVersion = "25.05";
+            boot.loader.systemd-boot.enable = true;
+            boot.loader.efi.canTouchEfiVariables = true;
+
             # Enable Nix flakes and nix-command on NixOS
             nix.settings.experimental-features = [
               "nix-command"
@@ -81,10 +92,6 @@
         vmGuest =
           { ... }:
           {
-
-            boot.loader.systemd-boot.enable = true;
-            boot.loader.efi.canTouchEfiVariables = true;
-
             # mount cd to /workspace transparently
             # Change directory to /workspace on login
             environment.loginShellInit = "cd /workspace";
@@ -108,44 +115,43 @@
             services.vscode-server.enable = true;
           };
       };
-      # Baremetal NixOS
-      nixosConfigurations.linuxBase = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          self.nixosModules.base
-        ];
-      };
+      nixosConfigurations = {
+        # NixOS VM on amd64 Linux Host
+        linuxVM = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            self.nixosModules.base
+            (self.nixosModules.mkVmHost nixpkgs.legacyPackages.x86_64-linux)
+            self.nixosModules.vmGuest
+          ];
+        };
 
-      # NixOS VM on amd64 Linux Host
-      nixosConfigurations.linuxVM = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          self.nixosModules.base
-          (self.nixosModules.mkVmHost nixpkgs.legacyPackages.x86_64-linux)
-          self.nixosModules.vmGuest
-        ];
+        # NixOS VM on arm64 MacOS Host
+        darwinVM = nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            self.nixosModules.base
+            (self.nixosModules.mkVmHost nixpkgs.legacyPackages.aarch64-darwin)
+            self.nixosModules.vmGuest
+          ];
+        };
       };
-      packages.x86_64-linux.vm = self.nixosConfigurations.linuxVM.config.system.build.vm;
-
-      # NixOS VM on arm64 MacOS Host
-      nixosConfigurations.darwinVM = nixpkgs.lib.nixosSystem {
-        system = "aarch64-linux";
-        modules = [
-          self.nixosModules.base
-          (self.nixosModules.mkVmHost nixpkgs.legacyPackages.aarch64-darwin)
-          self.nixosModules.vmGuest
-        ];
+      packages = {
+        x86_64-linux.vm = self.nixosConfigurations.linuxVM.config.system.build.vm;
+        aarch64-darwin.vm = self.nixosConfigurations.darwinVM.config.system.build.vm;
       };
-      packages.aarch64-darwin.vm = self.nixosConfigurations.darwinVM.config.system.build.vm;
       # Development shell
       devShells = builtins.listToAttrs (
-        map
-          (system: {
+        map (
+          system:
+          let
+            pkgsFor = import nixpkgs { inherit system; };
+          in
+          {
             name = system;
-            value =
-              pkgs:
-              pkgs.mkShell {
-                buildInputs = with pkgs; [
+            value = {
+              default = pkgsFor.mkShell {
+                buildInputs = with pkgsFor; [
                   nmap
                   nodejs_20
                   vim
@@ -156,14 +162,10 @@
                   tcpdump
                 ];
               };
-          })
-          [
-            # Dev Shell Systems
-            "x86_64-linux"
-            "aarch64-linux"
-            "x86_64-darwin"
-            "aarch64-darwin"
-          ]
+            };
+          }
+        ) hostSystems
       );
+
     };
 }
