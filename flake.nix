@@ -48,15 +48,15 @@
             ];
           };
 
-        vmHost =
-          { system, modulesPath, ... }:
+        mkVmHost =
+          hostPkgs:
+          { modulesPath, ... }:
           {
+            virtualisation.host.pkgs = hostPkgs;
             imports = [
               "${modulesPath}/virtualisation/qemu-vm.nix"
             ];
-
             virtualisation = {
-              host.pkgs = nixpkgs.legacyPackages.${system};
               sharedDirectories = {
                 workspace = {
                   source = builtins.toString ./.;
@@ -64,10 +64,10 @@
                 };
               };
               # Make VM output to the terminal instead of a separate window
-              vmVariant.virtualisation.graphics = false;
+              graphics = false;
 
               # For SSH
-              vmVariant.virtualisation.forwardPorts = [
+              forwardPorts = [
                 {
                   from = "host";
                   host.port = 2223;
@@ -121,28 +121,22 @@
         system = "x86_64-linux";
         modules = [
           self.nixosModules.base
-          self.nixosModules.vmHost
+          (self.nixosModules.mkVmHost nixpkgs.legacyPackages.x86_64-linux)
           self.nixosModules.vmGuest
         ];
       };
-      packages.x86_64-linux.linuxVM = self.nixosConfigurations.linuxVM.config.system.build.vm;
+      packages.x86_64-linux.vm = self.nixosConfigurations.linuxVM.config.system.build.vm;
 
       # NixOS VM on arm64 MacOS Host
       nixosConfigurations.darwinVM = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
         modules = [
           self.nixosModules.base
-          self.nixosModules.vmHost
+          (self.nixosModules.mkVmHost nixpkgs.legacyPackages.aarch64-darwin)
           self.nixosModules.vmGuest
-          (
-            { pkgs, ... }:
-            {
-              virtualisation.host.pkgs = nixpkgs.legacyPackages.aarch64-darwin;
-            }
-          )
         ];
       };
-      packages.aarch64-darwin.darwinVM = self.nixosConfigurations.darwinVM.config.system.build.vm;
+      packages.aarch64-darwin.vm = self.nixosConfigurations.darwinVM.config.system.build.vm;
       # Development shell
       devShells = builtins.listToAttrs (
         map
