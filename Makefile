@@ -108,11 +108,14 @@ re: clean
 	$(MAKE) all
 
 vm-up:
-	nix run --impure .#vm
+	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
+		.vm/cluster2nix.sh --cmd "nix run --impure .#vm"; \
+	else \
+		nix run --impure .#vm; \
+	fi
 
 vm-clean:
-	rm -rf ./nixos.qcow2
-
+	rm -rf ./nixos.qcow2 ./result
 
 vm-restart: vm-clean vm-up
 

@@ -1,0 +1,8 @@
+Host ft-nmap-vm
+  HostName localhost
+  Port     2223
+  User     root
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication yes
+  ForwardAgent yes
