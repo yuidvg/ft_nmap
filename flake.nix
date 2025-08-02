@@ -21,44 +21,6 @@
     in
     {
       nixosModules = {
-        base =
-          { pkgs, ... }:
-          {
-            system.stateVersion = "25.05";
-            boot.loader.systemd-boot.enable = true;
-            boot.loader.efi.canTouchEfiVariables = true;
-
-            # Enable Nix flakes and nix-command on NixOS
-            nix.settings.experimental-features = [
-              "nix-command"
-              "flakes"
-            ];
-
-            # Configure networking
-            # networking.useDHCP = false;
-            # networking.interfaces.eth0.useDHCP = true;
-
-            # Create user "dev"
-            services.getty.autologinUser = "dev";
-            users.users.dev.isNormalUser = true;
-
-            # Enable passwordless ‘sudo’ for the "test" user
-            users.users.dev.extraGroups = [ "wheel" ];
-            security.sudo.wheelNeedsPassword = false;
-
-            #System Wide Services
-            environment.systemPackages = with pkgs; [
-              nmap
-              nodejs_20
-              vim
-              git
-              gcc
-              gnumake
-              libpcap
-              tcpdump
-            ];
-          };
-
         mkVmHost =
           hostPkgs:
           { modulesPath, ... }:
@@ -70,7 +32,7 @@
             virtualisation = {
               sharedDirectories = {
                 workspace = {
-                  source = builtins.toString ./.;
+                  source = builtins.getEnv "PWD";
                   target = "/workspace";
                 };
               };
@@ -90,20 +52,82 @@
 
         # VM Modules
         vmGuest =
-          { ... }:
+          { pkgs, ... }:
           {
+            system.stateVersion = "25.05";
+            boot.loader.systemd-boot.enable = true;
+            boot.loader.efi.canTouchEfiVariables = true;
+
+            # Enable Nix flakes and nix-command on NixOS
+            nix.settings.experimental-features = [
+              "nix-command"
+              "flakes"
+            ];
+
+            # Configure networking
+            # networking.useDHCP = false;
+            # networking.interfaces.eth0.useDHCP = true;
+
+            # Create user "dev"
+            services.getty.autologinUser = "root";
+
+            users.users.root = {
+              password = "a";
+            };
+
+            #System Wide Services
+            environment = {
+              systemPackages = with pkgs; [
+                nmap
+                nodejs_20
+                vim
+                gcc
+                gnumake
+                libpcap
+                tcpdump
+                pkg-config
+                valgrind
+                strace
+                gdb
+                nil
+                nixfmt-rfc-style
+              ];
+              variables.PKG_CONFIG_PATH = "/run/current-system/sw/lib/pkgconfig:/run/current-system/sw/share/pkgconfig";
+            };
             # mount cd to /workspace transparently
             # Change directory to /workspace on login
             environment.loginShellInit = "cd /workspace";
             fileSystems."/workspace" = {
               device = "workspace";
               fsType = "9p";
-              options = "trans=virtio,version=9p2000.L,rw,cache=mmap,uid=1000,gid=100,fmode=0644,dmode=0755";
+              options = "trans=virtio,version=9p2000.L,rw,cache=mmap,uid=0,gid=0,fmode=0644,dmode=0755";
               neededForBoot = true;
+            };
+            systemd.services.copy-workspace.enable = false;
+
+            programs.git = {
+              enable = true;
+              config.safe.directory = [
+                "/workspace"
+              ];
+            };
+            programs.ssh.extraConfig = ''
+              Host github.com
+                StrictHostKeyChecking no
+                UserKnownHostsFile=/dev/null
+            '';
+            programs.direnv = {
+              enable = true;
+              nix-direnv.enable = true;
             };
 
             # Enable OpenSSH server so the host can connect into the VM
-            services.openssh.enable = true;
+            services.openssh = {
+              enable = true;
+              settings.PermitRootLogin = "yes";
+              settings.PasswordAuthentication = true;
+            };
+
             # Allow incoming SSH connections inside the guest
             networking.firewall.allowedTCPPorts = [ 22 ];
 
@@ -128,7 +152,6 @@
             value = nixpkgs.lib.nixosSystem {
               system = guest;
               modules = [
-                self.nixosModules.base
                 (self.nixosModules.mkVmHost hostPkgs)
                 self.nixosModules.vmGuest
               ];
