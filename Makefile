@@ -108,23 +108,17 @@ re: clean
 	$(MAKE) all
 
 vm-up:
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		nix run github:YorikSar/nixos-vm-on-macos; \
+	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
+		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
 	else \
-		./.vm/cluster2nix.sh --cmd "nix run .vm#vm"; \
+		nix run --impure .#vm; \
 	fi
 
-vm-down:
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		echo "VM cleanup not needed on macOS"; \
-	else \
-		./.vm/cluster2nix.sh --cleanup; \
-		rm -rf ./nixos.qcow2; \
-	fi
+vm-clean:
+	rm -rf ./nixos.qcow2 ./result
 
+vm-restart: vm-clean vm-up
 
-vm-restart: vm-down vm-up
-
-.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
+.PHONY: all app debug test clean re run-test vm-up vm-clean vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
 
 #-----------------------------------------------------------------------------------------------------------#
