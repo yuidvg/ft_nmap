@@ -115,31 +115,33 @@
             services.vscode-server.enable = true;
           };
       };
-      nixosConfigurations = {
-        # NixOS VM on amd64 Linux Host
-        linuxVM = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          modules = [
-            self.nixosModules.base
-            (self.nixosModules.mkVmHost nixpkgs.legacyPackages.x86_64-linux)
-            self.nixosModules.vmGuest
-          ];
-        };
-
-        # NixOS VM on arm64 MacOS Host
-        darwinVM = nixpkgs.lib.nixosSystem {
-          system = "aarch64-linux";
-          modules = [
-            self.nixosModules.base
-            (self.nixosModules.mkVmHost nixpkgs.legacyPackages.aarch64-darwin)
-            self.nixosModules.vmGuest
-          ];
-        };
-      };
-      packages = {
-        x86_64-linux.vm = self.nixosConfigurations.linuxVM.config.system.build.vm;
-        aarch64-darwin.vm = self.nixosConfigurations.darwinVM.config.system.build.vm;
-      };
+      nixosConfigurations = builtins.listToAttrs (
+        map (
+          host:
+          let
+            arch = builtins.head (builtins.split "-" host);
+            guest = "${arch}-linux";
+            hostPkgs = builtins.getAttr host nixpkgs.legacyPackages;
+          in
+          {
+            name = host;
+            value = nixpkgs.lib.nixosSystem {
+              system = guest;
+              modules = [
+                self.nixosModules.base
+                (self.nixosModules.mkVmHost hostPkgs)
+                self.nixosModules.vmGuest
+              ];
+            };
+          }
+        ) hostSystems
+      );
+      packages = builtins.listToAttrs (
+        map (host: {
+          name = host;
+          value.default = self.nixosConfigurations.${host}.config.system.build.vm;
+        }) hostSystems
+      );
       # Development shell
       devShells = builtins.listToAttrs (
         map (
