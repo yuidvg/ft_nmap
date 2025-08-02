@@ -139,7 +139,10 @@
       packages = builtins.listToAttrs (
         map (host: {
           name = host;
-          value.default = self.nixosConfigurations.${host}.config.system.build.vm;
+          value = rec {
+            vm = self.nixosConfigurations.${host}.config.system.build.vm;
+            default = vm;
+          };
         }) hostSystems
       );
       # Development shell
