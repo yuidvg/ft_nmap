@@ -18,6 +18,28 @@
         "x86_64-darwin"
         "aarch64-darwin"
       ];
+
+      basePackagesFor =
+        pkgs: with pkgs; [
+          nmap
+          git
+          gcc
+          gnumake
+          libpcap
+          tcpdump
+          pkg-config
+          gdb
+          nil
+          nixfmt-rfc-style
+          bear
+        ];
+
+      vmPackagesFor =
+        pkgs: with pkgs; [
+          strace
+          valgrind
+          nodejs_20
+        ];
     in
     {
       nixosModules = {
@@ -77,21 +99,7 @@
 
             #System Wide Services
             environment = {
-              systemPackages = with pkgs; [
-                nmap
-                nodejs_20
-                vim
-                gcc
-                gnumake
-                libpcap
-                tcpdump
-                pkg-config
-                valgrind
-                strace
-                gdb
-                nil
-                nixfmt-rfc-style
-              ];
+              systemPackages = basePackagesFor pkgs ++ vmPackagesFor pkgs;
               variables.PKG_CONFIG_PATH = "/run/current-system/sw/lib/pkgconfig:/run/current-system/sw/share/pkgconfig";
             };
             # mount cd to /workspace transparently
@@ -179,16 +187,7 @@
             name = system;
             value = {
               default = pkgsFor.mkShell {
-                buildInputs = with pkgsFor; [
-                  nmap
-                  nodejs_20
-                  vim
-                  git
-                  gcc
-                  gnumake
-                  libpcap
-                  tcpdump
-                ];
+                buildInputs = basePackagesFor pkgsFor;
               };
             };
           }
