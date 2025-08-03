@@ -22,7 +22,7 @@
 // External libraries
 # include <pcap.h>
 
-# define PACKET_LEN 4096
+//# define PACKET_LEN 4096
 
 typedef enum { false, true } bool;
 
@@ -43,16 +43,19 @@ typedef enum    e_scan_types {
 }               t_scan_types;
 
 typedef enum    e_result {
-    NOT,
-    SURE,
-    YET
+    FILTERED,
+    OPEN,
+    CLOSED
 }               t_result;
 
-
+typedef struct  s_probe {
+    t_scan_types   scan_type; // Type of scan to perform
+    struct sockaddr_in addr;   // Address to scan
+}               t_probe;
 
 typedef struct  s_task {
-    probe_t (scan_type, struct sockaddr_in);
-    //t_task_status   status;
+    t_probe         probe;
+    t_task_status   status;
     t_result        result;
     time_t          start;
 }               t_task;

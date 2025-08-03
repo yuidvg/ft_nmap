@@ -4,11 +4,11 @@ endif
 
 CC = gcc
 
-PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
-PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
-PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
+#PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
+#PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
+#PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
 
-CFLAGS_COMMON = -Wall -Wextra -Werror $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
+CFLAGS_COMMON = -Wall -Wextra -Werror 
 CFLAGS_DEBUG = -g -O0
 CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
@@ -56,13 +56,14 @@ LIBFT_SRC = $(wildcard $(LIBFT_DIR)/*.c)
 #-----------------------------------------------------------------------------------------------------------#
 # Rules
 #-----------------------------------------------------------------------------------------------------------#
-all: $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
 
 app: $(APP_BIN)
 
 debug: $(DEBUG_BIN)
 
 test: $(TEST_BIN)
+
+all: $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
 
 run-test: $(TEST_BIN)
 	./$(TEST_BIN)
