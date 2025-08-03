@@ -110,6 +110,8 @@ re: clean
 vm-up:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
 		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
+	elif grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then \
+		nix --extra-experimental-features 'nix-command flakes' run --impure .#vm; \
 	else \
 		nix run --impure .#vm; \
 	fi
