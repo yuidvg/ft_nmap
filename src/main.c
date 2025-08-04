@@ -6,7 +6,7 @@ int task_index = 0;
 int num_tasks = 0;
 char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
 int sock;
-
+pcap_t *handle;
 // Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
     long sum = 0;
@@ -70,6 +70,7 @@ pcap_t *setup_handle(const char *iface) {
     //pcap_set_snaplen(handle, 65536);                  // Set the max len of the packets. Good to set but the default is usually the same
     //pcap_set_timeout(handle, 100); for now redundant, because we're in immediate mode and we handle the timeouts later in the code
     pcap_set_immediate_mode(handle, 1);                 // Set the immediate mode. NEED TO LOOK AT LATER TO DECIDE WHICH IS BETTER
+    pcap_setnonblock(handle, 1, NULL);
     pcap_activate(handle);                              // Applies settings & activates the capture
     return handle;
 }
@@ -162,8 +163,73 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
         exit(EXIT_FAILURE);
     }
     printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
+    //sleep 100 ms
+    usleep(10000);
+    //
 }
 
+t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
+    //create the same number of tasks as probes
+    t_task *tasks = malloc(sizeof(t_task) *  probe_count);
+    if (!tasks) {
+        perror("Failed to allocate memory for tasks");
+        exit(EXIT_FAILURE);
+    }
+    for (uint16_t i = 0; i < probe_count; i++) {
+        tasks[i].probe = probes[i];
+        tasks[i].status = CREATED;
+        tasks[i].result = FILTERED;
+        tasks[i].function = send_syn_packet;
+    }
+    return tasks;
+}
+
+t_probe *build_probes(uint16_t probe_count) {
+    // Create an array of probes with different scan types
+    t_probe *probes = malloc(sizeof(t_probe) * probe_count);
+    if (!probes) {
+        perror("Failed to allocate memory for probes");
+        exit(EXIT_FAILURE);
+    }
+    //initialize the ports and ips
+    uint16_t ports[] = {80, 81, 444, 443};
+    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
+    // Initialize the probes with different scan types
+    for (uint16_t i = 0; i < 4; i++) {
+        probes[i].scan_type = SYN;
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(ports[i]);
+        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
+    }
+    for (uint16_t i = 4; i < probe_count; i++) {
+        probes[i].scan_type = SYN;
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(443 + i); // Use the same ports for simplicity
+        probes[i].addr.sin_addr.s_addr = inet_addr("8.8.8.8"); // Use the same IPs for simplicity
+    }
+    return probes;
+}
+
+void print_results(t_task *tasks, uint16_t probe_count) {
+    printf("[*] Scan results:\n");
+    for (uint16_t i = 0; i < probe_count; i++) {
+        const char *result_str;
+        switch (tasks[i].result) {
+            case OPEN:
+                result_str = "OPEN      ";
+                break;
+            case CLOSED:
+                result_str = "CLOSED    ";
+                break;
+            case FILTERED:
+                result_str = "FILTERED  ";
+                break;
+            default:
+                result_str = "UNKNOWN   ";
+        }
+        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+    }
+}
 
 void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
     //printf("0\n");
@@ -240,68 +306,62 @@ void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
     }
 
     // Report filtered/no response
+    /*
     for (int i = 0; i < probe_count; ++i) {
         if (!responses_received[i]) {
             //printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
             tasks[i].result = FILTERED;
         }
     }
+    */
 }
 
-t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
-    //create the same number of tasks as probes
-    t_task *tasks = malloc(sizeof(t_task) *  probe_count);
-    if (!tasks) {
-        perror("Failed to allocate memory for tasks");
-        exit(EXIT_FAILURE);
-    }
-    for (uint16_t i = 0; i < probe_count; i++) {
-        tasks[i].probe = probes[i];
-        tasks[i].status = CREATED;
-        tasks[i].result = FILTERED;
-        tasks[i].function = send_syn_packet;
-    }
-    return tasks;
-}
+void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data) {
+//    struct pcap_pkthdr *header;
+//    const u_char *data;
+//    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
 
-t_probe *build_probes(uint16_t probe_count) {
-    // Create an array of probes with different scan types
-    t_probe *probes = malloc(sizeof(t_probe) * probe_count);
-    if (!probes) {
-        perror("Failed to allocate memory for probes");
-        exit(EXIT_FAILURE);
-    }
-    //initialize the ports and ips
-    uint16_t ports[] = {80, 81, 444, 443};
-    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
-    // Initialize the probes with different scan types
-    for (uint16_t i = 0; i < probe_count; i++) {
-        probes[i].scan_type = i;
-        probes[i].addr.sin_family = AF_INET;
-        probes[i].addr.sin_port = htons(ports[i]);
-        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
-    }
-    return probes;
-}
+    struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
+    struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
 
-void print_results(t_task *tasks, uint16_t probe_count) {
-    printf("[*] Scan results:\n");
-    for (uint16_t i = 0; i < probe_count; i++) {
-        const char *result_str;
-        switch (tasks[i].result) {
-            case OPEN:
-                result_str = "OPEN      ";
-                break;
-            case CLOSED:
-                result_str = "CLOSED    ";
-                break;
-            case FILTERED:
-                result_str = "FILTERED  ";
-                break;
-            default:
-                result_str = "UNKNOWN   ";
+    // The ACK field in the response should be the sequence number we sent + 1
+    uint32_t ack = ntohl(rtcp->th_ack);
+
+    // Find which task this response corresponds to
+    for (int i = 0; i < num_tasks; ++i) {
+        // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
+        if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
+            printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
+            if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
+                printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
+                tasks[i].result = OPEN;
+            } else if (rtcp->th_flags & TH_RST) {
+                printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
+                tasks[i].result = CLOSED;
+            } else {
+                printf("[?] Port %d is FILTERED or no response\n", ntohs(rtcp->th_sport));
+                // Unexpected flags, treat as filtered
+                tasks[i].result = FILTERED;
+            }
+            tasks[i].status = COMPLETED;
+            break;
         }
-        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+    }
+}
+
+bool check_for_answer(t_task *tasks) {
+    struct pcap_pkthdr *header;
+    const u_char *packet;
+    int ret = pcap_next_ex(handle, &header, &packet);
+
+    if (ret == 1) {
+        handle_packet(tasks, packet);
+        return true;
+    } else if (ret == 0) {
+        return false;
+    } else {
+        printf("Error receiving packet %d\n", task_index);
+        return false;
     }
 }
 
@@ -309,6 +369,13 @@ void* worker(void* arg) {
     printf("starting thread\n");
     t_task *tasks = (t_task *)arg;
     while (1) {
+        if (pthread_mutex_trylock(&queue_mutex) == 0) {
+            bool check_message = true;
+            while (check_message) {
+                check_message = check_for_answer(tasks);
+            }
+            pthread_mutex_unlock(&queue_mutex);
+        }
         pthread_mutex_lock(&queue_mutex);
         if (task_index >= num_tasks) {
             pthread_mutex_unlock(&queue_mutex);
@@ -337,7 +404,7 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
     }
 
 // PROBE CREATION
-    uint16_t probe_count = 4;
+    uint16_t probe_count = 50;
     printf("[*] Building probes...\n");
     t_probe *probes = build_probes(probe_count);
     printf("[*] Created %d probes\n", scan_types_len);
@@ -355,7 +422,7 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
 
     sock = setup_socket(); // Set up the raw socket
 
-    pcap_t *handle = setup_handle(iface);
+    handle = setup_handle(iface);
     setup_filter(handle); // Needs to be improved A LOT
 
 // SENDING THE PACKETS - NOW WITH THREADS
