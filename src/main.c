@@ -1,5 +1,12 @@
 # include <../include/all.h>
 # include <../libft/libft.h>
+
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+int task_index = 0;
+int num_tasks = 0;
+char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
+int sock;
+
 // Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
     long sum = 0;
@@ -80,10 +87,16 @@ void setup_filter(pcap_t *handle) {
     }
 }
 
-void send_syn_packet(struct in_addr target_ip, const char *local_ip, uint16_t port, int sock, int i) {
+void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, int i) {
+    //Printing every argument for debugging purposes
+    //printf("[DEBUG] Sending SYN packet with local_ip: %s, sock: %d, test.sin_addr: %s, test.sin_port: %d, i: %d\n",
+    //       local_ip, sock, inet_ntoa(test.sin_addr), ntohs(test.sin_port), i);
+
+
     //printf("[*] Sending SYN packets to ports %d-%d...\n", base_port, base_port + 9);
 
-
+    const struct in_addr target_ip = test.sin_addr; // Get the target IP from the probe
+    const uint16_t port = test.sin_port; // Get the port from the probe
     // Allocate only as much as needed for headers
     char packet[sizeof(struct ip) + sizeof(struct tcphdr)]; // The size is just was we need for the headers
     memset(packet, 0, sizeof(packet));
@@ -153,6 +166,7 @@ void send_syn_packet(struct in_addr target_ip, const char *local_ip, uint16_t po
 
 
 void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
+    //printf("0\n");
     // This assumes probe_count is the number of tasks
 
     int responses_received[probe_count];
@@ -177,13 +191,15 @@ void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
         timeout.tv_sec = remaining;
         timeout.tv_usec = 0;
 
-        int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout);
-
-        if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) {
+        //printf("1\n");
+        int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout); // Wait for the pcap_fd to be ready. fd + 1 because it's checking a range
+        //printf("2\n");
+        if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) { // Check if pcap_fd is ready for reading
             struct pcap_pkthdr *header;
             const u_char *data;
-            int result = pcap_next_ex(handle, &header, &data);
-
+            //printf("3\n");
+            int result = pcap_next_ex(handle, &header, &data); // Read the next packet
+            //printf("4\n");
             if (result == 1) {
                 struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
                 struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
@@ -243,6 +259,7 @@ t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
         tasks[i].result = FILTERED;
+        tasks[i].function = send_syn_packet;
     }
     return tasks;
 }
@@ -288,16 +305,37 @@ void print_results(t_task *tasks, uint16_t probe_count) {
     }
 }
 
-int main(/*int argc, char *argv[]*/) {
-// PARSING
-    /*
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <target_ip> <port>\n", argv[0]);
-        exit(EXIT_FAILURE);
+void* worker(void* arg) {
+    printf("starting thread\n");
+    t_task *tasks = (t_task *)arg;
+    while (1) {
+        pthread_mutex_lock(&queue_mutex);
+        if (task_index >= num_tasks) {
+            pthread_mutex_unlock(&queue_mutex);
+            break;
+        }
+        const int my_index = task_index;
+        task_index++;
+        pthread_mutex_unlock(&queue_mutex);
+        tasks[my_index].function(local_ip, sock, tasks[my_index].probe.addr, my_index); // Call the function with the task ID and probe address
+
     }
-    const char *const target_ip = argv[1];
-    const int base_port = atoi(argv[2]);
-    */
+    return NULL;
+}
+
+int main(int argc, char *argv[]) {//Remove probe_count and the other global variables later
+// TEMPORARY PARSING
+    if (argc != 2) {
+        fprintf(stderr, "Need one arg\n");
+        return 1;
+    }
+
+    int num_threads = atoi(argv[1]);
+    if (num_threads < 0) {
+        fprintf(stderr, "Number of threads must be a >= to 0\n");
+        return 1;
+    }
+
 // PROBE CREATION
     uint16_t probe_count = 4;
     printf("[*] Building probes...\n");
@@ -308,24 +346,42 @@ int main(/*int argc, char *argv[]*/) {
     printf("[*] Created %d tasks\n", probe_count);
 
     // SETUP
-    char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];    // Retrieve the interface and ip we will use
+    //char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];    // Retrieve the interface and ip we will use
     if (get_local_ip_and_iface(iface, local_ip) != 0) {
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
     }
     printf("[*] Using interface: %s (%s)\n", iface, local_ip);
 
-    const int sock = setup_socket(); // Set up the raw socket
+    sock = setup_socket(); // Set up the raw socket
 
     pcap_t *handle = setup_handle(iface);
     setup_filter(handle); // Needs to be improved A LOT
-// SENDING THE PACKETS
+
+// SENDING THE PACKETS - NOW WITH THREADS
+
+    pthread_t *threads = malloc((num_threads) * (sizeof(pthread_t)));
+    num_tasks = probe_count; // REMOVE REDUNDANCY LATER
+    for (int i = 0; i < num_threads; ++i) {
+        int rc = pthread_create(&threads[i], NULL, worker, tasks);
+        if (rc != 0) {
+            fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
+            // handle cleanup or exit here
+        }
+    }
+    worker(tasks);
+    for (int i = 0; i < num_threads; ++i) {
+        pthread_join(threads[i], NULL);
+    }
+
+    //worker("test main\n", "test main2\n");
+    /*
     for (int i = 0; i < probe_count; ++i) {
         const struct in_addr target_ip = tasks[i].probe.addr.sin_addr; // Get the target IP from the probe
         const uint16_t port = tasks[i].probe.addr.sin_port; // Get the port from the probe
-        send_syn_packet(target_ip, local_ip, port, sock, i); // CHANGE to sending tasks, that way we can also initalize time
+        send_syn_packet(local_ip, sock, tasks[i].probe.addr, i); // CHANGE to sending tasks, that way we can also initalize time
     }
-
+    */
 // LISTENING FOR RESPONSES
     listen_for_responses(handle, tasks, probe_count);
 
@@ -333,7 +389,9 @@ int main(/*int argc, char *argv[]*/) {
 
     pcap_close(handle);
     close(sock);
+    pthread_mutex_destroy(&queue_mutex);
     return 0;
 }
+
 //sudo nmap -sS -p 80 scanme.nmap.org
 //sudo ./build/bin/ft_nmap 45.33.32.156 75

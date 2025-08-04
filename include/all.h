@@ -21,14 +21,16 @@
 # include <ifaddrs.h>
 // External libraries
 # include <pcap.h>
+# include <pthread.h>
 
 //# define PACKET_LEN 4096
 
 typedef enum { false, true } bool;
 
 typedef enum    e_task_status {
+    DEFAULT,
     CREATED,
-    FUNCTION_RAN,
+    SENT,
     COMPLETED
 }               t_task_status;
 
@@ -58,6 +60,7 @@ typedef struct  s_task {
     t_task_status   status;
     t_result        result;
     time_t          start;
+    void            (*function)(const char*, int, struct sockaddr_in, int);
 }               t_task;
 
 // IP and TCP headers

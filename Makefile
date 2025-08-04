@@ -8,7 +8,7 @@ CC = gcc
 #PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
 #PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
 
-CFLAGS_COMMON = -Wall -Wextra -Werror 
+CFLAGS_COMMON = -Wall -Wextra -Werror -pthread
 CFLAGS_DEBUG = -g -O0
 CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
