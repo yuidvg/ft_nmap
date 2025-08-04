@@ -196,10 +196,10 @@ void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
                     // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
                     if (!responses_received[i] && ack == (uint32_t)(i + 1)) {
                         if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
-                            printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
+                            //printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
                             tasks[i].result = OPEN;
                         } else if (rtcp->th_flags & TH_RST) {
-                            printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
+                            //printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
                             tasks[i].result = CLOSED;
                         } else {
                             // Unexpected flags, treat as filtered
@@ -226,7 +226,7 @@ void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
     // Report filtered/no response
     for (int i = 0; i < probe_count; ++i) {
         if (!responses_received[i]) {
-            printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
+            //printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
             tasks[i].result = FILTERED;
         }
     }
@@ -254,15 +254,38 @@ t_probe *build_probes(uint16_t probe_count) {
         perror("Failed to allocate memory for probes");
         exit(EXIT_FAILURE);
     }
-
+    //initialize the ports and ips
+    uint16_t ports[] = {80, 81, 444, 443};
+    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
     // Initialize the probes with different scan types
     for (uint16_t i = 0; i < probe_count; i++) {
         probes[i].scan_type = i;
-        probes[i].addr.sin_family = AF_INET; // Set address family to IPv4
-        probes[i].addr.sin_port = htons(80 + i);   // Port will be set later
-        probes[i].addr.sin_addr.s_addr = inet_addr("45.33.32.156");
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(ports[i]);
+        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
     }
     return probes;
+}
+
+void print_results(t_task *tasks, uint16_t probe_count) {
+    printf("[*] Scan results:\n");
+    for (uint16_t i = 0; i < probe_count; i++) {
+        const char *result_str;
+        switch (tasks[i].result) {
+            case OPEN:
+                result_str = "OPEN      ";
+                break;
+            case CLOSED:
+                result_str = "CLOSED    ";
+                break;
+            case FILTERED:
+                result_str = "FILTERED  ";
+                break;
+            default:
+                result_str = "UNKNOWN   ";
+        }
+        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+    }
 }
 
 int main(/*int argc, char *argv[]*/) {
@@ -276,7 +299,7 @@ int main(/*int argc, char *argv[]*/) {
     const int base_port = atoi(argv[2]);
     */
 // PROBE CREATION
-    uint16_t probe_count = 2;
+    uint16_t probe_count = 4;
     printf("[*] Building probes...\n");
     t_probe *probes = build_probes(probe_count);
     printf("[*] Created %d probes\n", scan_types_len);
@@ -305,6 +328,8 @@ int main(/*int argc, char *argv[]*/) {
 
 // LISTENING FOR RESPONSES
     listen_for_responses(handle, tasks, probe_count);
+
+    print_results(tasks, probe_count); // Print the results of the scan
 
     pcap_close(handle);
     close(sock);
