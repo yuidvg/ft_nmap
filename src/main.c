@@ -7,6 +7,8 @@ int num_tasks = 0;
 char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
 int sock;
 pcap_t *handle;
+time_t finish_time;
+
 // Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
     long sum = 0;
@@ -204,8 +206,8 @@ t_probe *build_probes(uint16_t probe_count) {
     for (uint16_t i = 4; i < probe_count; i++) {
         probes[i].scan_type = SYN;
         probes[i].addr.sin_family = AF_INET;
-        probes[i].addr.sin_port = htons(443 + i); // Use the same ports for simplicity
-        probes[i].addr.sin_addr.s_addr = inet_addr("8.8.8.8"); // Use the same IPs for simplicity
+        probes[i].addr.sin_port = htons(80 + i); // Use the same ports for simplicity
+        probes[i].addr.sin_addr.s_addr = inet_addr("45.33.32.156"); // Use the same IPs for simplicity
     }
     return probes;
 }
@@ -231,96 +233,11 @@ void print_results(t_task *tasks, uint16_t probe_count) {
     }
 }
 
-void listen_for_responses(pcap_t *handle, t_task *tasks, int probe_count) {
-    //printf("0\n");
-    // This assumes probe_count is the number of tasks
-
-    int responses_received[probe_count];
-    memset(responses_received, 0, sizeof(responses_received));
-    int total_responses = 0;
-
-    const int pcap_fd = pcap_get_selectable_fd(handle);
-    time_t start = time(NULL);
-
-    while (total_responses < probe_count) {
-        fd_set read_fds;
-        struct timeval timeout;
-
-        FD_ZERO(&read_fds);
-        FD_SET(pcap_fd, &read_fds);
-
-        // Wait up to 2 seconds for responses
-        const time_t elapsed = time(NULL) - start;
-        const time_t remaining = 2 - elapsed;
-        if (remaining <= 0) break;
-
-        timeout.tv_sec = remaining;
-        timeout.tv_usec = 0;
-
-        //printf("1\n");
-        int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout); // Wait for the pcap_fd to be ready. fd + 1 because it's checking a range
-        //printf("2\n");
-        if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) { // Check if pcap_fd is ready for reading
-            struct pcap_pkthdr *header;
-            const u_char *data;
-            //printf("3\n");
-            int result = pcap_next_ex(handle, &header, &data); // Read the next packet
-            //printf("4\n");
-            if (result == 1) {
-                struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
-                struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
-
-                // The ACK field in the response should be the sequence number we sent + 1
-                uint32_t ack = ntohl(rtcp->th_ack);
-
-                // Find which task this response corresponds to
-                for (int i = 0; i < probe_count; ++i) {
-                    // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
-                    if (!responses_received[i] && ack == (uint32_t)(i + 1)) {
-                        if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
-                            //printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
-                            tasks[i].result = OPEN;
-                        } else if (rtcp->th_flags & TH_RST) {
-                            //printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
-                            tasks[i].result = CLOSED;
-                        } else {
-                            // Unexpected flags, treat as filtered
-                            tasks[i].result = FILTERED;
-                        }
-                        responses_received[i] = 1;
-                        total_responses++;
-                        break;
-                    }
-                }
-            } else if (result == -1) {
-                fprintf(stderr, "Error reading packet: %s\n", pcap_geterr(handle));
-                break;
-            }
-        } else if (select_result == 0) {
-            // Timeout occurred
-            break;
-        } else if (select_result < 0) {
-            perror("select() failed");
-            break;
-        }
-    }
-
-    // Report filtered/no response
-    /*
-    for (int i = 0; i < probe_count; ++i) {
-        if (!responses_received[i]) {
-            //printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
-            tasks[i].result = FILTERED;
-        }
-    }
-    */
-}
-
 void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data) {
 //    struct pcap_pkthdr *header;
 //    const u_char *data;
 //    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
-
+    //printf("[*] Handling packet...\n");
     struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
     struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
 
@@ -331,6 +248,12 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
     for (int i = 0; i < num_tasks; ++i) {
         // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
         if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
+            if (TIMEOUT < tasks[i].start - time(NULL)) {
+                printf("[!] Task %d timed out\n", i);
+                tasks[i].result = FILTERED;
+                tasks[i].status = COMPLETED;
+                return;
+            }
             printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
             if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
                 printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
@@ -347,6 +270,56 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
             break;
         }
     }
+}
+
+void listen_for_responses(pcap_t *handle, t_task *tasks) {
+    printf("[*] Listening for responses...\n");
+    // This assumes probe_count is the number of tasks
+
+    const int pcap_fd = pcap_get_selectable_fd(handle);
+    time_t start = time(NULL);
+
+
+    fd_set read_fds;
+    struct timeval timeout;
+
+    FD_ZERO(&read_fds);
+    FD_SET(pcap_fd, &read_fds);
+
+    // Wait up to 2 seconds for responses
+    const time_t elapsed = time(NULL) - start;
+    const time_t remaining = 2 - elapsed;
+    if (remaining <= 0) return;
+
+    timeout.tv_sec = remaining;
+    timeout.tv_usec = 0;
+
+    int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout); // Wait for the pcap_fd to be ready. fd + 1 because it's checking a range
+    if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) { // Check if pcap_fd is ready for reading
+        printf("[*] Packet received, processing...\n");
+        struct pcap_pkthdr *header;
+        const u_char *data;
+        int result = pcap_next_ex(handle, &header, &data); // Read the next packet
+        if (result == 1) {
+            handle_packet(tasks, data); // Process the packet
+        } else if (result == -1) {
+            fprintf(stderr, "Error reading packet: %s\n", pcap_geterr(handle));
+        }
+    } else if (select_result == 0) {
+        printf("[*] No responses received within the timeout period.\n");
+    } else if (select_result < 0) {
+        perror("select() failed");
+    }
+
+    // Report filtered/no response
+    /*
+    for (int i = 0; i < probe_count; ++i) {
+        if (!responses_received[i]) {
+            //printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
+            tasks[i].result = FILTERED;
+        }
+    }
+    */
 }
 
 bool check_for_answer(t_task *tasks) {
@@ -384,9 +357,21 @@ void* worker(void* arg) {
         const int my_index = task_index;
         task_index++;
         pthread_mutex_unlock(&queue_mutex);
+        tasks[my_index].start = time(NULL);
         tasks[my_index].function(local_ip, sock, tasks[my_index].probe.addr, my_index); // Call the function with the task ID and probe address
-
+        tasks[my_index].status = SENT;
+        finish_time = time(NULL);// we start the timeout when the last task is sent
     }
+    if (pthread_mutex_trylock(&queue_mutex) == 0) {
+        bool check_message = true;
+        while (check_message || (TIMEOUT - (time(NULL) - finish_time)) > 0) {
+            //printf("Checking for answers in worker thread\n");
+            check_message = check_for_answer(tasks);
+        }
+        printf("[*] No more tasks to process, exiting thread\n");
+    }
+    pthread_mutex_unlock(&queue_mutex);
+    printf("Thread finished\n");
     return NULL;
 }
 
@@ -450,7 +435,7 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
     }
     */
 // LISTENING FOR RESPONSES
-    listen_for_responses(handle, tasks, probe_count);
+    //listen_for_responses(handle, tasks);
 
     print_results(tasks, probe_count); // Print the results of the scan
 
@@ -462,3 +447,5 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
 
 //sudo nmap -sS -p 80 scanme.nmap.org
 //sudo ./build/bin/ft_nmap 45.33.32.156 75
+
+//WE SHOULDN'T WAIT FOR THE TIMEOUT IF THERE'S NO MORE TASKS TO PROCESS, NEED A CHECKER
