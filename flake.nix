@@ -21,14 +21,15 @@
 
       basePackagesFor =
         pkgs: with pkgs; [
+          clang-tools
+          clang
           nmap
           git
-          gcc
+          lldb
           gnumake
           libpcap
           tcpdump
           pkg-config
-          gdb
           nil
           nixfmt-rfc-style
           bear
@@ -186,8 +187,9 @@
           {
             name = system;
             value = {
-              default = pkgsFor.mkShell {
+              default = pkgsFor.mkShell rec {
                 buildInputs = basePackagesFor pkgsFor;
+                CPATH = pkgsFor.lib.makeSearchPathOutput "dev" "include" buildInputs;
               };
             };
           }

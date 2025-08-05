@@ -2,14 +2,13 @@ ifeq ($(HOSTTYPE),)
 HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
-CC = gcc
+CC = clang
 # Pkg-config gives us the proper include/lib flags for libpcap –
 # `pthread` has no .pc file on most Linux systems, so we use the
 # compiler-provided `-pthread` switch instead.
 CFLAGS_LIBRARIES = $(shell pkg-config --cflags libpcap)
-CFLAGS_RELEASE   = -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES)
+CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES) -fblocks -isystem $(shell $(CC) -print-file-name=include) # Make cc include explicit
 CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
-
 LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap)
 LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
 LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g
