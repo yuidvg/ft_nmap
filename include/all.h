@@ -23,7 +23,7 @@
 # include <pcap.h>
 # include <pthread.h>
 
-//# define PACKET_LEN 4096
+# define TIMEOUT 2
 
 typedef enum { false, true } bool;
 
@@ -73,3 +73,39 @@ struct s_pseudo_header {
 };
 
 #endif
+
+/*
+//CORE
+    main
+    worker
+    build_tasks
+
+//SETUP SCAN
+    setup_socket
+    get_local_ip_and_iface
+    setup_handle
+    setup_filter
+
+//PRINTS
+    print_results
+
+//SENDING
+checksum
+send_syn_packet
+
+//RECEIVING
+check_for_answer
+handle_packet
+
+//tmp
+build_probes
+*/
+
+/*
+////TODO
+    Remove global variables when possible
+    Improve the way we handle timeouts
+    Improve setup_filter to be more specific
+    Improve error handling (errbuf, malloc returns, etc.)
+    change types to be more specific (e.g. use uint16_t, ...)
+*/

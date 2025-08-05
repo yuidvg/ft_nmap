@@ -1,13 +1,122 @@
 # include <../include/all.h>
 # include <../libft/libft.h>
 
+//only in worker and main
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 int task_index = 0;
 int num_tasks = 0;
-char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
 int sock;
 pcap_t *handle;
-time_t finish_time;
+//main+ (local_ip worker)
+char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
+time_t finish_time = time(NULL);
+
+////////// TEMPORARY //////////
+t_probe *build_probes(uint16_t probe_count) {
+    // Create an array of probes with different scan types
+    t_probe *probes = malloc(sizeof(t_probe) * probe_count);
+    if (!probes) {
+        perror("Failed to allocate memory for probes");
+        exit(EXIT_FAILURE);
+    }
+    //initialize the ports and ips
+    uint16_t ports[] = {80, 81, 444, 443};
+    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
+    // Initialize the probes with different scan types
+    for (uint16_t i = 0; i < 4; i++) {
+        probes[i].scan_type = SYN;
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(ports[i]);
+        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
+    }
+    for (uint16_t i = 4; i < probe_count; i++) {
+        probes[i].scan_type = SYN;
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(80 + i); // Use the same ports for simplicity
+        probes[i].addr.sin_addr.s_addr = inet_addr("45.33.32.156"); // Use the same IPs for simplicity
+    }
+    return probes;
+}
+
+////////// PRINTS //////////
+void print_results(t_task *tasks, uint16_t probe_count) {
+    printf("[*] Scan results:\n");
+    for (uint16_t i = 0; i < probe_count; i++) {
+        const char *result_str;
+        switch (tasks[i].result) {
+            case OPEN:
+                result_str = "OPEN      ";
+                break;
+            case CLOSED:
+                result_str = "CLOSED    ";
+                break;
+            case FILTERED:
+                result_str = "FILTERED  ";
+                break;
+            default:
+                result_str = "ERROR     ";
+        }
+        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+    }
+}
+
+////////// RECEIVING //////////
+
+void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data) {
+//    struct pcap_pkthdr *header;
+//    const u_char *data;
+//    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
+    //printf("[*] Handling packet...\n");
+    struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
+    struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
+
+    // The ACK field in the response should be the sequence number we sent + 1
+    uint32_t ack = ntohl(rtcp->th_ack);
+
+    // Find which task this response corresponds to
+    for (int i = 0; i < num_tasks; ++i) {
+        // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
+        if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
+            if (TIMEOUT < tasks[i].start - time(NULL)) {
+                printf("[!] Task %d timed out\n", i);
+                tasks[i].result = FILTERED;
+                tasks[i].status = COMPLETED;
+                return;
+            }
+            printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
+            if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
+                printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
+                tasks[i].result = OPEN;
+            } else if (rtcp->th_flags & TH_RST) {
+                printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
+                tasks[i].result = CLOSED;
+            } else {
+                printf("[?] Port %d is FILTERED or no response\n", ntohs(rtcp->th_sport));
+                // Unexpected flags, treat as filtered
+                tasks[i].result = FILTERED;
+            }
+            tasks[i].status = COMPLETED;
+            break;
+        }
+    }
+}
+
+bool check_for_answer(t_task *tasks) {
+    struct pcap_pkthdr *header;
+    const u_char *packet;
+    int ret = pcap_next_ex(handle, &header, &packet);
+
+    if (ret == 1) {
+        handle_packet(tasks, packet);
+        return true;
+    } else if (ret == 0) {
+        return false;
+    } else {
+        return false;
+    }
+}
+
+////////// SENDING //////////
 
 // Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
@@ -27,69 +136,6 @@ unsigned short checksum(unsigned short *ptr, int nbytes) {
     return (unsigned short)(~sum);
 }
 
-// Get the default interface and IP
-int get_local_ip_and_iface(char *iface, char *ip) {
-    struct ifaddrs *ifaddr, *ifa;
-    int family;
-    if (getifaddrs(&ifaddr) == -1) return -1;                           // If it succeeds, ifaddr is populated with a list of the interfaces
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {              // Loops through the interfaces list
-        if (ifa->ifa_addr == NULL) continue;                            // Skip an interface if it doesn't have an address
-        family = ifa->ifa_addr->sa_family;                              // Check if the address is ipv4, ipv6, etc...
-        if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {  // Select one that's ipv4, excluding the loopback interface
-            //stores the ip and interface in iface and ip (after).
-            ft_strcpy(iface, ifa->ifa_name);
-            getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
-            freeifaddrs(ifaddr);                                        // Free the result of getifaddrs()//NEED to check that the free was successful
-            return 0;
-        }
-    }
-    freeifaddrs(ifaddr);
-    return -1;
-}
-
-int setup_socket() {
-    // Create the raw socket
-    const int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);// Returns a file descriptor
-    if (sock < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set IP_HDRINCL which tells the kernel not to add an header (since we do it ourselves)
-    const int one = 1;
-    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-    //            (fd  , protocol  , option    , value, size      )
-        perror("Error setting IP_HDRINCL");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-    return sock;
-}
-
-pcap_t *setup_handle(const char *iface) {
-    char errbuf[PCAP_ERRBUF_SIZE];                      // Will store pcap errors
-    pcap_t *const handle = pcap_create(iface, errbuf);  // Create a pcap capture handle (takes the interface and the error buffer)
-    //pcap_set_snaplen(handle, 65536);                  // Set the max len of the packets. Good to set but the default is usually the same
-    //pcap_set_timeout(handle, 100); for now redundant, because we're in immediate mode and we handle the timeouts later in the code
-    pcap_set_immediate_mode(handle, 1);                 // Set the immediate mode. NEED TO LOOK AT LATER TO DECIDE WHICH IS BETTER
-    pcap_setnonblock(handle, 1, NULL);
-    pcap_activate(handle);                              // Applies settings & activates the capture
-    return handle;
-}
-
-void setup_filter(pcap_t *handle) {
-    char filter_exp[256];
-    snprintf(filter_exp, sizeof(filter_exp), "tcp"); // Simple filter, good enough for now but ideally it would be more specific
-    printf("[*] Using filter: %s\n", filter_exp);
-    struct bpf_program fp;
-    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
-        pcap_setfilter(handle, &fp) < 0) {
-        fprintf(stderr, "pcap filter error\n");
-        pcap_close(handle);
-        exit(EXIT_FAILURE);
-    }
-}
-
 void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, int i) {
     //Printing every argument for debugging purposes
     //printf("[DEBUG] Sending SYN packet with local_ip: %s, sock: %d, test.sin_addr: %s, test.sin_port: %d, i: %d\n",
@@ -102,7 +148,7 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
     const uint16_t port = test.sin_port; // Get the port from the probe
     // Allocate only as much as needed for headers
     char packet[sizeof(struct ip) + sizeof(struct tcphdr)]; // The size is just was we need for the headers
-    memset(packet, 0, sizeof(packet));
+    ft_memset(packet, 0, sizeof(packet));
     struct ip *const iph = (struct ip *) packet;
     struct tcphdr *const tcph = (struct tcphdr *) (packet + sizeof(struct ip));
 
@@ -147,9 +193,9 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
 
     // Create a pseudo packet - Pseudo header + TCP header
     char pseudo_packet[sizeof(struct s_pseudo_header) + sizeof(struct tcphdr)];
-    memset(pseudo_packet, 0, sizeof(pseudo_packet));                    // Initialization
-    memcpy(pseudo_packet, &psh, sizeof(psh));                           // Copy the pseudo header into the pseudo packet
-    memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));   // Append the TCP header
+    ft_memset(pseudo_packet, 0, sizeof(pseudo_packet));                    // Initialization
+    ft_memcpy(pseudo_packet, &psh, sizeof(psh));                           // Copy the pseudo header into the pseudo packet
+    ft_memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));   // Append the TCP header
 
     tcph->th_sum = 0;
     tcph->th_sum = checksum((unsigned short *)pseudo_packet, sizeof(psh) + sizeof(struct tcphdr));
@@ -170,6 +216,72 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
     //
 }
 
+////////// SETUP SCAN //////////
+
+// Get the default interface and IP
+int get_local_ip_and_iface(char *iface, char *ip) {
+    struct ifaddrs *ifaddr, *ifa;
+    int family;
+    if (getifaddrs(&ifaddr) == -1) return -1;                           // If it succeeds, ifaddr is populated with a list of the interfaces
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {              // Loops through the interfaces list
+        if (ifa->ifa_addr == NULL) continue;                            // Skip an interface if it doesn't have an address
+        family = ifa->ifa_addr->sa_family;                              // Check if the address is ipv4, ipv6, etc...
+        if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {  // Select one that's ipv4, excluding the loopback interface
+            //stores the ip and interface in iface and ip (after).
+            ft_strcpy(iface, ifa->ifa_name);
+            getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
+            freeifaddrs(ifaddr);                                        // Free the result of getifaddrs()//NEED to check that the free was successful
+            return 0;
+        }
+    }
+    freeifaddrs(ifaddr);
+    return -1;
+}
+
+int setup_socket() {
+    // Create the raw socket
+    const int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);// Returns a file descriptor
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    // Set IP_HDRINCL which tells the kernel not to add an header (since we do it ourselves)
+    const int one = 1;
+    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+    //            (fd  , protocol  , option    , value, size      )
+        perror("Error setting IP_HDRINCL");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+    return sock;
+}
+
+pcap_t *setup_handle(const char *iface) {
+    char errbuf[PCAP_ERRBUF_SIZE];                      // Will store pcap errors
+    pcap_t *const handle = pcap_create(iface, errbuf);  // Create a pcap capture handle (takes the interface and the error buffer)
+    //pcap_set_snaplen(handle, 65536);                  // Set the max len of the packets. Good to set but the default is usually the same
+    //pcap_set_timeout(handle, 100); for now redundant, because we're in immediate mode and we handle the timeouts later in the code
+    pcap_set_immediate_mode(handle, 1);                 // Set the immediate mode. NEED TO LOOK AT LATER TO DECIDE WHICH IS BETTER
+    pcap_setnonblock(handle, 1, errbuf);                // Set the non-blocking mode (so we can handle the packets as they come in)
+    pcap_activate(handle);                              // Applies settings & activates the capture
+    return handle;
+}
+
+void setup_filter(pcap_t *handle) {
+    char filter_exp[256];
+    snprintf(filter_exp, sizeof(filter_exp), "tcp"); // Simple filter, good enough for now but ideally it would be more specific
+    printf("[*] Using filter: %s\n", filter_exp);
+    struct bpf_program fp;
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
+        pcap_setfilter(handle, &fp) < 0) {
+        fprintf(stderr, "pcap filter error\n");
+        pcap_close(handle);
+        exit(EXIT_FAILURE);
+    }
+}
+
+////////// CORE //////////
+
 t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
     //create the same number of tasks as probes
     t_task *tasks = malloc(sizeof(t_task) *  probe_count);
@@ -184,158 +296,6 @@ t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
         tasks[i].function = send_syn_packet;
     }
     return tasks;
-}
-
-t_probe *build_probes(uint16_t probe_count) {
-    // Create an array of probes with different scan types
-    t_probe *probes = malloc(sizeof(t_probe) * probe_count);
-    if (!probes) {
-        perror("Failed to allocate memory for probes");
-        exit(EXIT_FAILURE);
-    }
-    //initialize the ports and ips
-    uint16_t ports[] = {80, 81, 444, 443};
-    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
-    // Initialize the probes with different scan types
-    for (uint16_t i = 0; i < 4; i++) {
-        probes[i].scan_type = SYN;
-        probes[i].addr.sin_family = AF_INET;
-        probes[i].addr.sin_port = htons(ports[i]);
-        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
-    }
-    for (uint16_t i = 4; i < probe_count; i++) {
-        probes[i].scan_type = SYN;
-        probes[i].addr.sin_family = AF_INET;
-        probes[i].addr.sin_port = htons(80 + i); // Use the same ports for simplicity
-        probes[i].addr.sin_addr.s_addr = inet_addr("45.33.32.156"); // Use the same IPs for simplicity
-    }
-    return probes;
-}
-
-void print_results(t_task *tasks, uint16_t probe_count) {
-    printf("[*] Scan results:\n");
-    for (uint16_t i = 0; i < probe_count; i++) {
-        const char *result_str;
-        switch (tasks[i].result) {
-            case OPEN:
-                result_str = "OPEN      ";
-                break;
-            case CLOSED:
-                result_str = "CLOSED    ";
-                break;
-            case FILTERED:
-                result_str = "FILTERED  ";
-                break;
-            default:
-                result_str = "UNKNOWN   ";
-        }
-        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
-    }
-}
-
-void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data) {
-//    struct pcap_pkthdr *header;
-//    const u_char *data;
-//    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
-    //printf("[*] Handling packet...\n");
-    struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
-    struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
-
-    // The ACK field in the response should be the sequence number we sent + 1
-    uint32_t ack = ntohl(rtcp->th_ack);
-
-    // Find which task this response corresponds to
-    for (int i = 0; i < num_tasks; ++i) {
-        // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
-        if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
-            if (TIMEOUT < tasks[i].start - time(NULL)) {
-                printf("[!] Task %d timed out\n", i);
-                tasks[i].result = FILTERED;
-                tasks[i].status = COMPLETED;
-                return;
-            }
-            printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
-            if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
-                printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
-                tasks[i].result = OPEN;
-            } else if (rtcp->th_flags & TH_RST) {
-                printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
-                tasks[i].result = CLOSED;
-            } else {
-                printf("[?] Port %d is FILTERED or no response\n", ntohs(rtcp->th_sport));
-                // Unexpected flags, treat as filtered
-                tasks[i].result = FILTERED;
-            }
-            tasks[i].status = COMPLETED;
-            break;
-        }
-    }
-}
-
-void listen_for_responses(pcap_t *handle, t_task *tasks) {
-    printf("[*] Listening for responses...\n");
-    // This assumes probe_count is the number of tasks
-
-    const int pcap_fd = pcap_get_selectable_fd(handle);
-    time_t start = time(NULL);
-
-
-    fd_set read_fds;
-    struct timeval timeout;
-
-    FD_ZERO(&read_fds);
-    FD_SET(pcap_fd, &read_fds);
-
-    // Wait up to 2 seconds for responses
-    const time_t elapsed = time(NULL) - start;
-    const time_t remaining = 2 - elapsed;
-    if (remaining <= 0) return;
-
-    timeout.tv_sec = remaining;
-    timeout.tv_usec = 0;
-
-    int select_result = select(pcap_fd + 1, &read_fds, NULL, NULL, &timeout); // Wait for the pcap_fd to be ready. fd + 1 because it's checking a range
-    if (select_result > 0 && FD_ISSET(pcap_fd, &read_fds)) { // Check if pcap_fd is ready for reading
-        printf("[*] Packet received, processing...\n");
-        struct pcap_pkthdr *header;
-        const u_char *data;
-        int result = pcap_next_ex(handle, &header, &data); // Read the next packet
-        if (result == 1) {
-            handle_packet(tasks, data); // Process the packet
-        } else if (result == -1) {
-            fprintf(stderr, "Error reading packet: %s\n", pcap_geterr(handle));
-        }
-    } else if (select_result == 0) {
-        printf("[*] No responses received within the timeout period.\n");
-    } else if (select_result < 0) {
-        perror("select() failed");
-    }
-
-    // Report filtered/no response
-    /*
-    for (int i = 0; i < probe_count; ++i) {
-        if (!responses_received[i]) {
-            //printf("[?] Port %d is FILTERED or no response\n", ntohs(tasks[i].probe.addr.sin_port));
-            tasks[i].result = FILTERED;
-        }
-    }
-    */
-}
-
-bool check_for_answer(t_task *tasks) {
-    struct pcap_pkthdr *header;
-    const u_char *packet;
-    int ret = pcap_next_ex(handle, &header, &packet);
-
-    if (ret == 1) {
-        handle_packet(tasks, packet);
-        return true;
-    } else if (ret == 0) {
-        return false;
-    } else {
-        printf("Error receiving packet %d\n", task_index);
-        return false;
-    }
 }
 
 void* worker(void* arg) {
@@ -425,15 +385,6 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
     for (int i = 0; i < num_threads; ++i) {
         pthread_join(threads[i], NULL);
     }
-
-    //worker("test main\n", "test main2\n");
-    /*
-    for (int i = 0; i < probe_count; ++i) {
-        const struct in_addr target_ip = tasks[i].probe.addr.sin_addr; // Get the target IP from the probe
-        const uint16_t port = tasks[i].probe.addr.sin_port; // Get the port from the probe
-        send_syn_packet(local_ip, sock, tasks[i].probe.addr, i); // CHANGE to sending tasks, that way we can also initalize time
-    }
-    */
 // LISTENING FOR RESPONSES
     //listen_for_responses(handle, tasks);
 
