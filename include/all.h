@@ -47,7 +47,8 @@ typedef enum    e_scan_types {
 typedef enum    e_result {
     FILTERED,
     OPEN,
-    CLOSED
+    CLOSED,
+    UNEXPECTED
 }               t_result;
 
 typedef struct  s_probe {
@@ -63,14 +64,24 @@ typedef struct  s_task {
     void            (*function)(const char*, int, struct sockaddr_in, int);
 }               t_task;
 
-// IP and TCP headers
-struct s_pseudo_header {
+typedef struct  s_thread_args {
+    t_task          *tasks;
+    int             sock;
+    pcap_t          *handle;
+    char            iface[IFNAMSIZ];            //might not be necessary to be here
+    char            local_ip[INET_ADDRSTRLEN];;
+    int             task_index;
+    int             num_tasks;
+}               t_thread_args;
+
+// Used for the checksum calculation
+typedef struct s_pseudo_header {
     uint32_t src;
     uint32_t dst;
     uint8_t reserved;
     uint8_t protocol;
     uint16_t tcp_length;
-};
+}               t_pseudo_header;
 
 #endif
 
@@ -103,8 +114,9 @@ build_probes
 
 /*
 ////TODO
+    Remove probe_count redundancy
     Remove global variables when possible
-    Improve the way we handle timeouts
+    Improve the way we handle timeouts (currently we're waiting until the last possible time, despite the fast that the last signal sent may have been answered already)
     Improve setup_filter to be more specific
     Improve error handling (errbuf, malloc returns, etc.)
     change types to be more specific (e.g. use uint16_t, ...)

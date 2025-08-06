@@ -1,15 +1,7 @@
 # include <../include/all.h>
 # include <../libft/libft.h>
 
-//only in worker and main
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-int task_index = 0;
-int num_tasks = 0;
-int sock;
-pcap_t *handle;
-//main+ (local_ip worker)
-char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];
-time_t finish_time = time(NULL);
 
 ////////// TEMPORARY //////////
 t_probe *build_probes(uint16_t probe_count) {
@@ -62,7 +54,7 @@ void print_results(t_task *tasks, uint16_t probe_count) {
 
 ////////// RECEIVING //////////
 
-void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data) {
+void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, int num_tasks) {
 //    struct pcap_pkthdr *header;
 //    const u_char *data;
 //    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
@@ -91,9 +83,8 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
                 printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
                 tasks[i].result = CLOSED;
             } else {
-                printf("[?] Port %d is FILTERED or no response\n", ntohs(rtcp->th_sport));
-                // Unexpected flags, treat as filtered
-                tasks[i].result = FILTERED;
+                printf("[?] Port %d is UNEXPECTED\n", ntohs(rtcp->th_sport));
+                tasks[i].result = UNEXPECTED;
             }
             tasks[i].status = COMPLETED;
             break;
@@ -101,13 +92,13 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
     }
 }
 
-bool check_for_answer(t_task *tasks) {
+bool check_for_answer(t_task *tasks, pcap_t *handle, int num_tasks) {
     struct pcap_pkthdr *header;
     const u_char *packet;
     int ret = pcap_next_ex(handle, &header, &packet);
 
     if (ret == 1) {
-        handle_packet(tasks, packet);
+        handle_packet(tasks, packet, num_tasks);
         return true;
     } else if (ret == 0) {
         return false;
@@ -184,7 +175,7 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
 //       printf("[DEBUG] Sending SYN from port %d to port %d\n", source_port, port);
 
     // Calculate TCP checksum - Calculated over the tcp header, the data, and parts of the IP header (hence the need for a pseudo header)
-    struct s_pseudo_header psh;                     // The pseudo header
+    t_pseudo_header psh;                     // The pseudo header
     psh.src = iph->ip_src.s_addr;                   // Source IP address
     psh.dst = iph->ip_dst.s_addr;                   // Destination IP address
     psh.reserved = 0;                               // Always 0
@@ -192,7 +183,7 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
     psh.tcp_length = htons(sizeof(struct tcphdr));
 
     // Create a pseudo packet - Pseudo header + TCP header
-    char pseudo_packet[sizeof(struct s_pseudo_header) + sizeof(struct tcphdr)];
+    char pseudo_packet[sizeof(t_pseudo_header) + sizeof(struct tcphdr)];
     ft_memset(pseudo_packet, 0, sizeof(pseudo_packet));                    // Initialization
     ft_memcpy(pseudo_packet, &psh, sizeof(psh));                           // Copy the pseudo header into the pseudo packet
     ft_memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));   // Append the TCP header
@@ -300,33 +291,34 @@ t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
 
 void* worker(void* arg) {
     printf("starting thread\n");
-    t_task *tasks = (t_task *)arg;
+    t_thread_args *args = (t_thread_args*)arg;
+    time_t finish_time = time(NULL);
     while (1) {
         if (pthread_mutex_trylock(&queue_mutex) == 0) {
             bool check_message = true;
             while (check_message) {
-                check_message = check_for_answer(tasks);
+                check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
             }
             pthread_mutex_unlock(&queue_mutex);
         }
         pthread_mutex_lock(&queue_mutex);
-        if (task_index >= num_tasks) {
+        if (args->task_index >= args->num_tasks) {
             pthread_mutex_unlock(&queue_mutex);
             break;
         }
-        const int my_index = task_index;
-        task_index++;
+        const int my_index = args->task_index;
+        args->task_index++;
         pthread_mutex_unlock(&queue_mutex);
-        tasks[my_index].start = time(NULL);
-        tasks[my_index].function(local_ip, sock, tasks[my_index].probe.addr, my_index); // Call the function with the task ID and probe address
-        tasks[my_index].status = SENT;
+        args->tasks[my_index].start = time(NULL);
+        args->tasks[my_index].function(args->local_ip, args->sock, args->tasks[my_index].probe.addr, my_index); // Call the function with the task ID and probe address
+        args->tasks[my_index].status = SENT;
         finish_time = time(NULL);// we start the timeout when the last task is sent
     }
     if (pthread_mutex_trylock(&queue_mutex) == 0) {
         bool check_message = true;
         while (check_message || (TIMEOUT - (time(NULL) - finish_time)) > 0) {
             //printf("Checking for answers in worker thread\n");
-            check_message = check_for_answer(tasks);
+            check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
         }
         printf("[*] No more tasks to process, exiting thread\n");
     }
@@ -353,45 +345,47 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
     printf("[*] Building probes...\n");
     t_probe *probes = build_probes(probe_count);
     printf("[*] Created %d probes\n", scan_types_len);
+// SETUP
+    t_thread_args args;
     printf("[*] Building tasks from probes...\n");
-    t_task *tasks = build_tasks(probes, probe_count);
+    args.tasks = build_tasks(probes, probe_count);
     printf("[*] Created %d tasks\n", probe_count);
-
-    // SETUP
-    //char iface[IFNAMSIZ], local_ip[INET_ADDRSTRLEN];    // Retrieve the interface and ip we will use
-    if (get_local_ip_and_iface(iface, local_ip) != 0) {
+    if (get_local_ip_and_iface(args.iface, args.local_ip) != 0) {
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
     }
-    printf("[*] Using interface: %s (%s)\n", iface, local_ip);
-
-    sock = setup_socket(); // Set up the raw socket
-
-    handle = setup_handle(iface);
-    setup_filter(handle); // Needs to be improved A LOT
+    printf("[*] Using interface: %s (%s)\n", args.iface, args.local_ip);
+    args.sock = setup_socket(); // Set up the raw socket
+    args.handle = setup_handle(args.iface);
+    setup_filter(args.handle); // Needs to be improved A LOT
 
 // SENDING THE PACKETS - NOW WITH THREADS
 
     pthread_t *threads = malloc((num_threads) * (sizeof(pthread_t)));
-    num_tasks = probe_count; // REMOVE REDUNDANCY LATER
+    if (!threads) {
+        printf("Failed to allocate memory for threads\n");
+        exit(EXIT_FAILURE);
+    }
+    args.task_index = 0;
+    args.num_tasks = probe_count; // REMOVE REDUNDANCY LATER
     for (int i = 0; i < num_threads; ++i) {
-        int rc = pthread_create(&threads[i], NULL, worker, tasks);
+        int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {
             fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
             // handle cleanup or exit here
         }
     }
-    worker(tasks);
+    worker((void *)&args);
     for (int i = 0; i < num_threads; ++i) {
         pthread_join(threads[i], NULL);
     }
 // LISTENING FOR RESPONSES
     //listen_for_responses(handle, tasks);
 
-    print_results(tasks, probe_count); // Print the results of the scan
+    print_results(args.tasks, probe_count); // Print the results of the scan
 
-    pcap_close(handle);
-    close(sock);
+    pcap_close(args.handle);
+    close(args.sock);
     pthread_mutex_destroy(&queue_mutex);
     return 0;
 }
