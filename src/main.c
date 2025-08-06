@@ -12,7 +12,7 @@ t_probe *build_probes(uint16_t num_tasks) {
         exit(EXIT_FAILURE);
     }
     //initialize the ports and ips
-    uint16_t ports[] = {80, 81, 444, 443};
+    const uint16_t ports[] = {80, 81, 444, 443};
     const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
     // Initialize the probes with different scan types
     for (uint16_t i = 0; i < 4; i++) {
@@ -31,7 +31,7 @@ t_probe *build_probes(uint16_t num_tasks) {
 }
 
 ////////// PRINTS //////////
-void print_results(t_task *tasks, uint16_t num_tasks) {
+void print_results(const t_task *tasks, const uint16_t num_tasks) {
     printf("[*] Scan results:\n");
     for (uint16_t i = 0; i < num_tasks; i++) {
         const char *result_str;
@@ -54,13 +54,13 @@ void print_results(t_task *tasks, uint16_t num_tasks) {
 
 ////////// RECEIVING //////////
 
-void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, uint16_t num_tasks) {
+void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, const uint16_t num_tasks) {
     //printf("[*] Handling packet...\n");
-    struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
-    struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
+    const struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
+    const struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
 
     // The ACK field in the response should be the sequence number we sent + 1
-    uint32_t ack = ntohl(rtcp->th_ack);
+    const uint32_t ack = ntohl(rtcp->th_ack);
 
     // Find which task this response corresponds to
     for (uint16_t i = 0; i < num_tasks; ++i) {
@@ -89,10 +89,10 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
     }
 }
 
-bool check_for_answer(t_task *tasks, pcap_t *handle, uint16_t num_tasks) {
+bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks) {
     struct pcap_pkthdr *header;
     const u_char *packet;
-    int ret = pcap_next_ex(handle, &header, &packet);
+    const int ret = pcap_next_ex(handle, &header, &packet);
 
     if (ret == 1) {
         handle_packet(tasks, packet, num_tasks);
@@ -124,7 +124,7 @@ unsigned short checksum(unsigned short *ptr, int nbytes) {
     return (unsigned short)(~sum);
 }
 
-void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, uint16_t i) {
+void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i) {
     //Printing every argument for debugging purposes
     //printf("[DEBUG] Sending SYN packet with local_ip: %s, sock: %d, test.sin_addr: %s, test.sin_port: %d, i: %d\n",
     //       local_ip, sock, inet_ntoa(test.sin_addr), ntohs(test.sin_port), i);
@@ -270,7 +270,7 @@ void setup_filter(pcap_t *handle) {
 
 ////////// CORE //////////
 
-t_task *build_tasks(t_probe *probes, uint16_t num_tasks) {
+t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
     //create the same number of tasks as probes
     t_task *tasks = malloc(sizeof(t_task) * num_tasks);
     if (!tasks) {
@@ -336,7 +336,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int num_threads = atoi(argv[1]);
+    const int num_threads = atoi(argv[1]);
     if (num_threads < 0) {
         fprintf(stderr, "Number of threads must be a >= to 0\n");
         return 1;
@@ -345,7 +345,7 @@ int main(int argc, char *argv[]) {
 // SETUP
     t_thread_args args;
     args.num_tasks = 50;    // TEMPORARY
-    t_probe *probes = build_probes(args.num_tasks);
+    const t_probe *probes = build_probes(args.num_tasks);
     printf("[*] Created %d probes\n", scan_types_len);
     args.tasks = build_tasks(probes, args.num_tasks);
     printf("[*] Created %d tasks\n", args.num_tasks);
@@ -371,7 +371,7 @@ int main(int argc, char *argv[]) {
     args.all_tasks_sent = false;
     args.finish_time = 0;
     for (int i = 0; i < num_threads; ++i) {
-        int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
+        const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {
             fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
             //<handle error>!
