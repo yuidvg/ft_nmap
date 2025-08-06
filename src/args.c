@@ -20,16 +20,6 @@ void print_help_and_exit(void)
     exit(EXIT_SUCCESS);
 }
 
-void safely_exit(const int code)
-{
-    exit(code);
-}
-
-void print_error_and_exit(const char *const message)
-{
-    fprintf(stderr, "Error: %s\n", message);
-    safely_exit(EXIT_FAILURE);
-}
 
 /* Helper function to parse port ranges and individual ports */
 static void parse_port_string(const char *const port_str, int ports_out[PORTS_MAX])

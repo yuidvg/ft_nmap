@@ -50,11 +50,4 @@ typedef struct
 {
     memory_block_t *head;
     pthread_mutex_t mutex;
-    const bool initialized;
 } memory_manager_t;
-
-typedef struct
-{
-    const bool succeeded;
-    void *const ptr;
-} malloc_result_t;

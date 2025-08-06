@@ -11,7 +11,7 @@ CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBR
 CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
 LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap)
 LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
-LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g
+LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g -fsanitize=address
 
 MAKE = make
 
@@ -36,7 +36,11 @@ TEST_OBJ_DIR = $(OBJ_DIR)/test
 TEST_OBJ = $(patsubst $(TEST_DIR)/%.c,$(TEST_OBJ_DIR)/%.o,$(TEST_SRC))
 
 TEST_DIR = test
-TEST_SRC = $(TEST_DIR)/test.c $(TEST_DIR)/munit.c
+TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
+
+# Test dependencies - need memory.c and error.c for tests
+TEST_DEP_SRC = $(APP_DIR)/memory.c $(APP_DIR)/error.c
+TEST_DEP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(TEST_DEP_SRC))
 
 # App
 APP_BIN = $(BIN_DIR)/ft_nmap
@@ -77,8 +81,8 @@ $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 
 # Tests
 # Link
-$(TEST_BIN): $(TEST_OBJ)
-	$(CC) $(LDFLAGS_DEBUG) -o $@ $(TEST_OBJ)
+$(TEST_BIN): $(TEST_OBJ) $(TEST_DEP_OBJ)
+	$(CC) $(LDFLAGS_DEBUG) -o $@ $(TEST_OBJ) $(TEST_DEP_OBJ)
 # Compile
 $(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS_DEBUG) -c $< -o $@

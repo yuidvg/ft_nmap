@@ -19,41 +19,34 @@ static void *thread_allocate_function(void *const arg)
     for (size_t i = 0; i < data->allocations_per_thread && *data->should_continue; ++i)
     {
         const size_t alloc_size = 64 + (i % 256); // Varying sizes
-        const malloc_result_t result = safe_malloc(alloc_size);
+        const void *const ptr = safe_malloc_or_exit(alloc_size);
 
-        if (result.succeeded && result.ptr != NULL)
+        if (ptr != nullptr)
         {
-            data->allocated_ptrs[i] = result.ptr;
+            data->allocated_ptrs[i] = (void *)ptr;
             // Write some data to verify the allocation works
-            *((int *)result.ptr) = data->thread_id;
+            *((int *)ptr) = data->thread_id;
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
-// Test: Memory manager initialization
-static MunitResult test_memory_manager_init(const MunitParameter params[], void *const data)
+// Test: Basic memory allocation (constructor/destructor automatic)
+static MunitResult test_memory_auto_management(const MunitParameter params[], void *const data)
 {
     (void)params;
     (void)data;
 
-    // Clean up any previous state
-    memory_manager_cleanup();
+    // Should be able to allocate immediately (constructor handles initialization)
+    const void *const ptr = safe_malloc_or_exit(64);
+    munit_assert_ptr_not_null(ptr);
 
-    // Test initial state
-    munit_assert_false(is_memory_manager_initialized());
+    // Write test data
+    *((int *)ptr) = 42;
+    munit_assert_int(*((int *)ptr), ==, 42);
 
-    // Test initialization
-    const malloc_result_t init_result = memory_manager_init();
-    munit_assert_true(init_result.succeeded);
-    munit_assert_true(is_memory_manager_initialized());
-
-    // Test double initialization (should succeed)
-    const malloc_result_t second_init = memory_manager_init();
-    munit_assert_true(second_init.succeeded);
-
-    memory_manager_cleanup();
+    // Note: destructor will automatically cleanup when program exits
     return MUNIT_OK;
 }
 
@@ -71,13 +64,12 @@ static MunitResult test_basic_allocation(const MunitParameter params[], void *co
 
     for (size_t i = 0; i < num_sizes; ++i)
     {
-        const malloc_result_t result = safe_malloc(test_sizes[i]);
-        munit_assert_true(result.succeeded);
-        munit_assert_ptr_not_null(result.ptr);
+        const void *const ptr = safe_malloc_or_exit(test_sizes[i]);
+        munit_assert_ptr_not_null(ptr);
 
         // Verify we can write to the allocated memory
-        *((char *)result.ptr) = 'A';
-        munit_assert_char(*(char *)result.ptr, ==, 'A');
+        *((char *)ptr) = 'A';
+        munit_assert_char(*(char *)ptr, ==, 'A');
     }
 
     memory_manager_cleanup();
@@ -92,9 +84,8 @@ static MunitResult test_zero_size_allocation(const MunitParameter params[], void
 
     memory_manager_cleanup();
 
-    const malloc_result_t result = safe_malloc(0);
-    munit_assert_false(result.succeeded);
-    munit_assert_ptr_null(result.ptr);
+    const void *const ptr = safe_malloc_or_exit(0);
+    munit_assert_ptr_null(ptr);
 
     memory_manager_cleanup();
     return MUNIT_OK;
@@ -122,20 +113,20 @@ static MunitResult test_thread_safety(const MunitParameter params[], void *const
         // Initialize mutable fields before making them conceptually immutable
         *((int *)&thread_data[i].thread_id) = i;
         *((size_t *)&thread_data[i].allocations_per_thread) = allocations_per_thread;
-        *((void ***)&thread_data[i].allocated_ptrs) = allocated_ptrs[i];
+        *((void ***)&thread_data[i].allocated_ptrs) = (void **)allocated_ptrs[i];
         *((const bool **)&thread_data[i].should_continue) = &should_continue;
 
         // Initialize allocated_ptrs array
         for (size_t j = 0; j < allocations_per_thread; ++j)
         {
-            allocated_ptrs[i][j] = NULL;
+            allocated_ptrs[i][j] = nullptr;
         }
     }
 
     // Create threads
     for (int i = 0; i < num_threads; ++i)
     {
-        const int create_result = pthread_create(&threads[i], NULL,
+        const int create_result = pthread_create(&threads[i], nullptr,
                                                thread_allocate_function,
                                                &thread_data[i]);
         munit_assert_int(create_result, ==, 0);
@@ -144,7 +135,7 @@ static MunitResult test_thread_safety(const MunitParameter params[], void *const
     // Wait for threads to complete
     for (int i = 0; i < num_threads; ++i)
     {
-        const int join_result = pthread_join(threads[i], NULL);
+        const int join_result = pthread_join(threads[i], nullptr);
         munit_assert_int(join_result, ==, 0);
     }
 
@@ -153,7 +144,7 @@ static MunitResult test_thread_safety(const MunitParameter params[], void *const
     {
         for (size_t j = 0; j < allocations_per_thread; ++j)
         {
-            if (allocated_ptrs[i][j] != NULL)
+            if (allocated_ptrs[i][j] != nullptr)
             {
                 // Verify the data we wrote
                 const int written_value = *((int *)allocated_ptrs[i][j]);
@@ -175,25 +166,20 @@ static MunitResult test_cleanup(const MunitParameter params[], void *const data)
     memory_manager_cleanup();
 
     // Allocate some memory
-    const malloc_result_t result1 = safe_malloc(100);
-    const malloc_result_t result2 = safe_malloc(200);
-    const malloc_result_t result3 = safe_malloc(300);
+    const void *const ptr1 = safe_malloc_or_exit(100);
+    const void *const ptr2 = safe_malloc_or_exit(200);
+    const void *const ptr3 = safe_malloc_or_exit(300);
 
-    munit_assert_true(result1.succeeded);
-    munit_assert_true(result2.succeeded);
-    munit_assert_true(result3.succeeded);
-    munit_assert_true(is_memory_manager_initialized());
+    munit_assert_ptr_not_null(ptr1);
+    munit_assert_ptr_not_null(ptr2);
+    munit_assert_ptr_not_null(ptr3);
 
-    // Clean up
+            // Clean up
     memory_manager_cleanup();
 
-    // Verify cleanup
-    munit_assert_false(is_memory_manager_initialized());
-
     // Should be able to allocate again after cleanup
-    const malloc_result_t result4 = safe_malloc(400);
-    munit_assert_true(result4.succeeded);
-    munit_assert_ptr_not_null(result4.ptr);
+    const void *const ptr4 = safe_malloc_or_exit(400);
+    munit_assert_ptr_not_null(ptr4);
 
     memory_manager_cleanup();
     return MUNIT_OK;
@@ -202,57 +188,57 @@ static MunitResult test_cleanup(const MunitParameter params[], void *const data)
 // Test suite definition
 static MunitTest memory_tests[] = {
     {
-        .name = "/init",
-        .test = test_memory_manager_init,
-        .setup = NULL,
-        .tear_down = NULL,
+        .name = "/auto_management",
+        .test = test_memory_auto_management,
+        .setup = nullptr,
+        .tear_down = nullptr,
         .options = MUNIT_TEST_OPTION_NONE,
-        .parameters = NULL
+        .parameters = nullptr
     },
     {
         .name = "/basic_allocation",
         .test = test_basic_allocation,
-        .setup = NULL,
-        .tear_down = NULL,
+        .setup = nullptr,
+        .tear_down = nullptr,
         .options = MUNIT_TEST_OPTION_NONE,
-        .parameters = NULL
+        .parameters = nullptr
     },
     {
         .name = "/zero_size",
         .test = test_zero_size_allocation,
-        .setup = NULL,
-        .tear_down = NULL,
+        .setup = nullptr,
+        .tear_down = nullptr,
         .options = MUNIT_TEST_OPTION_NONE,
-        .parameters = NULL
+        .parameters = nullptr
     },
     {
         .name = "/thread_safety",
         .test = test_thread_safety,
-        .setup = NULL,
-        .tear_down = NULL,
+        .setup = nullptr,
+        .tear_down = nullptr,
         .options = MUNIT_TEST_OPTION_NONE,
-        .parameters = NULL
+        .parameters = nullptr
     },
     {
         .name = "/cleanup",
         .test = test_cleanup,
-        .setup = NULL,
-        .tear_down = NULL,
+        .setup = nullptr,
+        .tear_down = nullptr,
         .options = MUNIT_TEST_OPTION_NONE,
-        .parameters = NULL
+        .parameters = nullptr
     },
-    { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
+    { nullptr, nullptr, nullptr, nullptr, MUNIT_TEST_OPTION_NONE, nullptr }
 };
 
 static const MunitSuite memory_suite = {
     .prefix = "/memory",
     .tests = memory_tests,
-    .suites = NULL,
+    .suites = nullptr,
     .iterations = 1,
     .options = MUNIT_SUITE_OPTION_NONE
 };
 
 int main(const int argc, char *const argv[])
 {
-    return munit_suite_main(&memory_suite, NULL, argc, argv);
+    return munit_suite_main(&memory_suite, nullptr, argc, argv);
 }
