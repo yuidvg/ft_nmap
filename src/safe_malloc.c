@@ -168,41 +168,6 @@ static void track_allocation(void *ptr, size_t size)
 }
 
 /**
- * Remove an allocation from the tracking list
- * @param ptr: Pointer to memory being freed
- */
-static void untrack_allocation(void *ptr)
-{
-    if (ptr == NULL) return;
-
-    pthread_mutex_lock(&allocation_mutex);
-    
-    allocation_node_t *current = allocation_list;
-    allocation_node_t *prev = NULL;
-
-    while (current != NULL)
-    {
-        if (current->ptr == ptr)
-        {
-            if (prev == NULL)
-            {
-                allocation_list = current->next;
-            }
-            else
-            {
-                prev->next = current->next;
-            }
-            free(current);
-            break;
-        }
-        prev = current;
-        current = current->next;
-    }
-
-    pthread_mutex_unlock(&allocation_mutex);
-}
-
-/**
  * Thread-safe malloc that tracks allocations
  * @param size: Number of bytes to allocate
  * @return: Pointer to allocated memory (never NULL)
@@ -269,43 +234,77 @@ void *tracked_realloc(void *ptr, size_t size)
     if (size == 0)
     {
         /* Standard behavior: free the pointer and return NULL */
+        /* Note: The tracking entry remains and will be cleaned up by tracked_free_all() */
         if (ptr != NULL)
         {
-            untrack_allocation(ptr);
-            free(ptr);
+            /* Update tracking to mark as freed */
+            pthread_mutex_lock(&allocation_mutex);
+            allocation_node_t *current = allocation_list;
+            while (current != NULL)
+            {
+                if (current->ptr == ptr)
+                {
+                    free(ptr);
+                    current->ptr = NULL; /* Mark as freed but keep node for tracked_free_all() */
+                    current->size = 0;
+                    break;
+                }
+                current = current->next;
+            }
+            pthread_mutex_unlock(&allocation_mutex);
         }
         return NULL;
     }
 
-    /* Remove old tracking before realloc */
-    if (ptr != NULL)
+    if (ptr == NULL)
     {
-        untrack_allocation(ptr);
+        /* This is a new allocation, track it */
+        void *new_ptr = realloc(NULL, size);
+        if (new_ptr == NULL)
+        {
+            fprintf(stderr, "Error: Failed to reallocate %zu bytes\n", size);
+            exit(EXIT_FAILURE);
+        }
+        track_allocation(new_ptr, size);
+        return new_ptr;
     }
-
-    void *new_ptr = realloc(ptr, size);
-    if (new_ptr == NULL)
+    else
     {
-        fprintf(stderr, "Error: Failed to reallocate %zu bytes\n", size);
-        exit(EXIT_FAILURE);
+        /* Find the tracking node before realloc */
+        allocation_node_t *tracking_node = NULL;
+        
+        pthread_mutex_lock(&allocation_mutex);
+        allocation_node_t *current = allocation_list;
+        while (current != NULL)
+        {
+            if (current->ptr == ptr)
+            {
+                tracking_node = current;
+                break;
+            }
+            current = current->next;
+        }
+        pthread_mutex_unlock(&allocation_mutex);
+        
+        /* Perform realloc */
+        void *new_ptr = realloc(ptr, size);
+        if (new_ptr == NULL)
+        {
+            fprintf(stderr, "Error: Failed to reallocate %zu bytes\n", size);
+            exit(EXIT_FAILURE);
+        }
+        
+        /* Update tracking node with new pointer */
+        if (tracking_node != NULL)
+        {
+            pthread_mutex_lock(&allocation_mutex);
+            tracking_node->ptr = new_ptr;
+            tracking_node->size = size;
+            pthread_mutex_unlock(&allocation_mutex);
+        }
+        
+        return new_ptr;
     }
-
-    /* Track the new allocation */
-    track_allocation(new_ptr, size);
-
-    return new_ptr;
-}
-
-/**
- * Thread-safe free that removes allocation from tracking
- * @param ptr: Pointer to memory to be freed
- */
-void tracked_free(void *ptr)
-{
-    if (ptr == NULL) return;
-
-    untrack_allocation(ptr);
-    free(ptr);
 }
 
 /**
@@ -319,7 +318,12 @@ void tracked_free_all(void)
     while (current != NULL)
     {
         allocation_node_t *next = current->next;
-        free(current->ptr);
+        
+        /* Only free if the pointer is not NULL (not already freed) */
+        if (current->ptr != NULL)
+        {
+            free(current->ptr);
+        }
         free(current);
         current = next;
     }

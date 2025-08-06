@@ -200,10 +200,8 @@ static MunitResult test_tracked_malloc_valid(const MunitParameter params[], void
     void *ptr3 = tracked_malloc(sizeof(int) * 100);
     munit_assert_not_null(ptr3);
     
-    /* Free individual allocations */
-    tracked_free(ptr1);
-    tracked_free(ptr2);
-    tracked_free(ptr3);
+    /* All allocations will be freed by tracked_free_all() */
+    tracked_free_all();
     
     return MUNIT_OK;
 }
@@ -233,8 +231,8 @@ static MunitResult test_tracked_calloc_valid(const MunitParameter params[], void
         munit_assert_char(ptr2[i], ==, '\0');
     }
     
-    tracked_free(ptr1);
-    tracked_free(ptr2);
+    /* All allocations will be freed by tracked_free_all() */
+    tracked_free_all();
     
     return MUNIT_OK;
 }
@@ -282,7 +280,9 @@ static MunitResult test_tracked_realloc_valid(const MunitParameter params[], voi
     /* Test realloc with NULL pointer (should behave like malloc) */
     ptr = (int*)tracked_realloc(NULL, sizeof(int) * 5);
     munit_assert_not_null(ptr);
-    tracked_free(ptr);
+    
+    /* All allocations will be freed by tracked_free_all() */
+    tracked_free_all();
     
     return MUNIT_OK;
 }
@@ -376,7 +376,9 @@ static MunitResult test_tracked_cleanup(const MunitParameter params[], void* use
     /* After cleanup, we can still use the tracker */
     void *ptr3 = tracked_malloc(50);
     munit_assert_not_null(ptr3);
-    tracked_free(ptr3);
+    
+    /* Clean up again */
+    tracked_cleanup();
     
     return MUNIT_OK;
 }

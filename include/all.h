@@ -17,7 +17,6 @@ void  safe_free(void **ptr);
 void *tracked_malloc(size_t size);
 void *tracked_calloc(size_t nmemb, size_t size);
 void *tracked_realloc(void *ptr, size_t size);
-void  tracked_free(void *ptr);
 void  tracked_free_all(void);
 void  tracked_cleanup(void);
 
