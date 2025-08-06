@@ -1,0 +1,3 @@
+#!/usr/bin/env -S nix shell nixpkgs#bash --command bash
+# Run the program with the memory management hook
+./build/bin/ft_nmap "$@"

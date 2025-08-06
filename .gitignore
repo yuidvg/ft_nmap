@@ -24,6 +24,7 @@
 *.dt
 *.tar*
 *.qcow2
+build/
 .vm/result
 result
 *.nfs*
@@ -31,5 +32,4 @@ thread_test
 pcap_test
 .direnv
 simple_test
-ft_nmap
 .cache

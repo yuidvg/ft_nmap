@@ -8,3 +8,7 @@
 
 #define PORT_UNDEFINED -1
 #define PORTS_MAX 1024
+
+/* Macro for initializing fixed-length arrays in immutable structs */
+#define INIT_ARRAY_ELEMENT(array, index) .array[index] = array[index]
+

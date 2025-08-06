@@ -27,38 +27,29 @@
 /* ------------------------------------------------------------------------- */
 int main(int argc, char *argv[])
 {
+    /* Initialize program with memory management */
+    const char *const program_name =  strdup(argv[0]);
+    if (program_name == nullptr)
+    {
+        print_error_and_exit("Failed to allocate memory for program name");
+    }
     /* Parse command-line options (pure) */
     const ft_nmap_args_t opts = parse_arguments(argc, argv);
 
-    if (opts.help)
-    {
-        print_help_and_exit();
-    }
-    else
-    {
-        /* Print the parsed arguments for debugging/verification */
-        printf("Parsed arguments:\n");
-        printf("  help: %s\n", opts.help ? "true" : "false");
-        printf("  file_path: %s\n", opts.file_path ? opts.file_path : "(null)");
-        printf("  scan_type: %d\n", opts.scan_type);
-        printf("  speedup: %d\n", opts.speedup);
+    /* Print the parsed arguments for debugging/verification */
+    printf("Parsed arguments:\n");
+    printf("  file_path: %s\n", opts.file_path ? opts.file_path : "(null)");
+    printf("  scan_type: %d\n", opts.scan_type);
+    printf("  speedup: %d\n", opts.speedup);
 
-        printf("  ip_addresses:\n");
-        for (size_t i = 0; i < IP_ADDRESSES_MAX; ++i)
-        {
-            if (opts.ip_addresses[i] != NULL)
-            {
-                printf("    [%zu]: %s\n", i, opts.ip_addresses[i]);
-            }
-        }
+    printf("  ip_addresses:\n");
 
-        printf("  ports:\n");
-        for (size_t i = 0; i < PORTS_MAX; ++i)
+    printf("  ports:\n");
+    for (size_t i = 0; i < PORTS_MAX; ++i)
+    {
+        if (opts.ports[i] != PORT_UNDEFINED)
         {
-            if (opts.ports[i] != PORT_UNDEFINED)
-            {
-                printf("    [%zu]: %d\n", i, opts.ports[i]);
-            }
+            printf("    [%zu]: %d\n", i, opts.ports[i]);
         }
     }
 
