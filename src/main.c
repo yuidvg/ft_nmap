@@ -4,9 +4,9 @@
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 ////////// TEMPORARY //////////
-t_probe *build_probes(uint16_t probe_count) {
+t_probe *build_probes(uint16_t num_tasks) {
     // Create an array of probes with different scan types
-    t_probe *probes = malloc(sizeof(t_probe) * probe_count);
+    t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
     if (!probes) {
         perror("Failed to allocate memory for probes");
         exit(EXIT_FAILURE);
@@ -21,7 +21,7 @@ t_probe *build_probes(uint16_t probe_count) {
         probes[i].addr.sin_port = htons(ports[i]);
         probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
     }
-    for (uint16_t i = 4; i < probe_count; i++) {
+    for (uint16_t i = 4; i < num_tasks; i++) {
         probes[i].scan_type = SYN;
         probes[i].addr.sin_family = AF_INET;
         probes[i].addr.sin_port = htons(80 + i); // Use the same ports for simplicity
@@ -31,9 +31,9 @@ t_probe *build_probes(uint16_t probe_count) {
 }
 
 ////////// PRINTS //////////
-void print_results(t_task *tasks, uint16_t probe_count) {
+void print_results(t_task *tasks, uint16_t num_tasks) {
     printf("[*] Scan results:\n");
-    for (uint16_t i = 0; i < probe_count; i++) {
+    for (uint16_t i = 0; i < num_tasks; i++) {
         const char *result_str;
         switch (tasks[i].result) {
             case OPEN:
@@ -273,14 +273,14 @@ void setup_filter(pcap_t *handle) {
 
 ////////// CORE //////////
 
-t_task *build_tasks(t_probe *probes, uint16_t probe_count) {
+t_task *build_tasks(t_probe *probes, uint16_t num_tasks) {
     //create the same number of tasks as probes
-    t_task *tasks = malloc(sizeof(t_task) *  probe_count);
+    t_task *tasks = malloc(sizeof(t_task) * num_tasks);
     if (!tasks) {
         perror("Failed to allocate memory for tasks");
         exit(EXIT_FAILURE);
     }
-    for (uint16_t i = 0; i < probe_count; i++) {
+    for (uint16_t i = 0; i < num_tasks; i++) {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
         tasks[i].result = FILTERED;
@@ -327,7 +327,7 @@ void* worker(void* arg) {
     return NULL;
 }
 
-int main(int argc, char *argv[]) {//Remove probe_count and the other global variables later
+int main(int argc, char *argv[]) {
 // TEMPORARY PARSING
     if (argc != 2) {
         fprintf(stderr, "Need one arg\n");
@@ -340,26 +340,25 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
         return 1;
     }
 
-// PROBE CREATION
-    uint16_t probe_count = 50;
-    printf("[*] Building probes...\n");
-    t_probe *probes = build_probes(probe_count);
-    printf("[*] Created %d probes\n", scan_types_len);
 // SETUP
     t_thread_args args;
-    printf("[*] Building tasks from probes...\n");
-    args.tasks = build_tasks(probes, probe_count);
-    printf("[*] Created %d tasks\n", probe_count);
+    args.num_tasks = 50;    // TEMPORARY
+    t_probe *probes = build_probes(args.num_tasks);
+    printf("[*] Created %d probes\n", scan_types_len);
+    args.tasks = build_tasks(probes, args.num_task);
+    printf("[*] Created %d tasks\n", args.num_task);
+
     if (get_local_ip_and_iface(args.iface, args.local_ip) != 0) {
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
     }
     printf("[*] Using interface: %s (%s)\n", args.iface, args.local_ip);
-    args.sock = setup_socket(); // Set up the raw socket
+
+    args.sock = setup_socket();
     args.handle = setup_handle(args.iface);
     setup_filter(args.handle); // Needs to be improved A LOT
 
-// SENDING THE PACKETS - NOW WITH THREADS
+// SENDING THE PACKETS
 
     pthread_t *threads = malloc((num_threads) * (sizeof(pthread_t)));
     if (!threads) {
@@ -367,22 +366,21 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
         exit(EXIT_FAILURE);
     }
     args.task_index = 0;
-    args.num_tasks = probe_count; // REMOVE REDUNDANCY LATER
     for (int i = 0; i < num_threads; ++i) {
         int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {
             fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
-            // handle cleanup or exit here
+            //<handle error>!
         }
     }
     worker((void *)&args);
     for (int i = 0; i < num_threads; ++i) {
         pthread_join(threads[i], NULL);
     }
-// LISTENING FOR RESPONSES
-    //listen_for_responses(handle, tasks);
 
-    print_results(args.tasks, probe_count); // Print the results of the scan
+// RESULTS AND CLEANUP
+
+    print_results(args.tasks, args.num_tasks); // Print the results of the scan
 
     pcap_close(args.handle);
     close(args.sock);
@@ -392,5 +390,3 @@ int main(int argc, char *argv[]) {//Remove probe_count and the other global vari
 
 //sudo nmap -sS -p 80 scanme.nmap.org
 //sudo ./build/bin/ft_nmap 45.33.32.156 75
-
-//WE SHOULDN'T WAIT FOR THE TIMEOUT IF THERE'S NO MORE TASKS TO PROCESS, NEED A CHECKER

@@ -71,7 +71,7 @@ typedef struct  s_thread_args {
     char            iface[IFNAMSIZ];            //might not be necessary to be here
     char            local_ip[INET_ADDRSTRLEN];;
     int             task_index;
-    int             num_tasks;
+    uint16_t        num_tasks;
 }               t_thread_args;
 
 // Used for the checksum calculation
@@ -97,9 +97,6 @@ typedef struct s_pseudo_header {
     setup_handle
     setup_filter
 
-//PRINTS
-    print_results
-
 //SENDING
 checksum
 send_syn_packet
@@ -108,14 +105,15 @@ send_syn_packet
 check_for_answer
 handle_packet
 
+//PRINTS
+    print_results
+
 //tmp
 build_probes
 */
 
 /*
 ////TODO
-    Remove probe_count redundancy
-    Remove global variables when possible
     Improve the way we handle timeouts (currently we're waiting until the last possible time, despite the fast that the last signal sent may have been answered already)
     Improve setup_filter to be more specific
     Improve error handling (errbuf, malloc returns, etc.)
