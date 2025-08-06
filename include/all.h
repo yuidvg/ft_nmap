@@ -61,7 +61,7 @@ typedef struct  s_task {
     t_task_status   status;
     t_result        result;
     time_t          start;
-    void            (*function)(const char*, int, struct sockaddr_in, int);
+    void            (*function)(const char*, int, struct sockaddr_in, uint16_t);
 }               t_task;
 
 typedef struct  s_thread_args {
@@ -70,7 +70,7 @@ typedef struct  s_thread_args {
     pcap_t          *handle;
     char            iface[IFNAMSIZ];            //might not be necessary to be here
     char            local_ip[INET_ADDRSTRLEN];;
-    int             task_index;
+    uint16_t        task_index;
     uint16_t        num_tasks;
 }               t_thread_args;
 

@@ -54,7 +54,7 @@ void print_results(t_task *tasks, uint16_t num_tasks) {
 
 ////////// RECEIVING //////////
 
-void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, int num_tasks) {
+void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, uint16_t num_tasks) {
 //    struct pcap_pkthdr *header;
 //    const u_char *data;
 //    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
@@ -66,7 +66,7 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
     uint32_t ack = ntohl(rtcp->th_ack);
 
     // Find which task this response corresponds to
-    for (int i = 0; i < num_tasks; ++i) {
+    for (uint16_t i = 0; i < num_tasks; ++i) {
         // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
         if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
             if (TIMEOUT < tasks[i].start - time(NULL)) {
@@ -92,7 +92,7 @@ void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_
     }
 }
 
-bool check_for_answer(t_task *tasks, pcap_t *handle, int num_tasks) {
+bool check_for_answer(t_task *tasks, pcap_t *handle, uint16_t num_tasks) {
     struct pcap_pkthdr *header;
     const u_char *packet;
     int ret = pcap_next_ex(handle, &header, &packet);
@@ -127,7 +127,7 @@ unsigned short checksum(unsigned short *ptr, int nbytes) {
     return (unsigned short)(~sum);
 }
 
-void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, int i) {
+void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, uint16_t i) {
     //Printing every argument for debugging purposes
     //printf("[DEBUG] Sending SYN packet with local_ip: %s, sock: %d, test.sin_addr: %s, test.sin_port: %d, i: %d\n",
     //       local_ip, sock, inet_ntoa(test.sin_addr), ntohs(test.sin_port), i);
@@ -162,7 +162,7 @@ void send_syn_packet(const char *local_ip, int sock, struct sockaddr_in test, in
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const int source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
@@ -306,7 +306,7 @@ void* worker(void* arg) {
             pthread_mutex_unlock(&queue_mutex);
             break;
         }
-        const int my_index = args->task_index;
+        const uint16_t my_index = args->task_index;
         args->task_index++;
         pthread_mutex_unlock(&queue_mutex);
         args->tasks[my_index].start = time(NULL);
@@ -345,8 +345,8 @@ int main(int argc, char *argv[]) {
     args.num_tasks = 50;    // TEMPORARY
     t_probe *probes = build_probes(args.num_tasks);
     printf("[*] Created %d probes\n", scan_types_len);
-    args.tasks = build_tasks(probes, args.num_task);
-    printf("[*] Created %d tasks\n", args.num_task);
+    args.tasks = build_tasks(probes, args.num_tasks);
+    printf("[*] Created %d tasks\n", args.num_tasks);
 
     if (get_local_ip_and_iface(args.iface, args.local_ip) != 0) {
         perror("Could not determine local IP/interface");
