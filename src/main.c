@@ -55,9 +55,6 @@ void print_results(t_task *tasks, uint16_t num_tasks) {
 ////////// RECEIVING //////////
 
 void handle_packet(t_task *tasks/*, const struct pcap_pkthdr *header*/, const u_char *data, uint16_t num_tasks) {
-//    struct pcap_pkthdr *header;
-//    const u_char *data;
-//    int result = pcap_next_ex(handle, &header, &data); // Read the next packet
     //printf("[*] Handling packet...\n");
     struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
     struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
@@ -290,40 +287,45 @@ t_task *build_tasks(t_probe *probes, uint16_t num_tasks) {
 }
 
 void* worker(void* arg) {
-    printf("starting thread\n");
     t_thread_args *args = (t_thread_args*)arg;
-    time_t finish_time = time(NULL);
+    bool is_receiver = false;
+
     while (1) {
         if (pthread_mutex_trylock(&queue_mutex) == 0) {
             bool check_message = true;
-            while (check_message) {
+            while (check_message) {// Before sending a task, we check if there are any responses to handle
                 check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
             }
             pthread_mutex_unlock(&queue_mutex);
         }
         pthread_mutex_lock(&queue_mutex);
-        if (args->task_index >= args->num_tasks) {
+        if (args->task_index >= args->num_tasks) {// When all tasks are sent, we choose a thread to be the receiver and we lock the timer
+            if (!args->all_tasks_sent) {
+                args->all_tasks_sent = true;
+                args->finish_time = time(NULL);
+                is_receiver = true;
+            }
             pthread_mutex_unlock(&queue_mutex);
             break;
         }
-        const uint16_t my_index = args->task_index;
-        args->task_index++;
+        const uint16_t my_index = args->task_index++;
         pthread_mutex_unlock(&queue_mutex);
+
         args->tasks[my_index].start = time(NULL);
-        args->tasks[my_index].function(args->local_ip, args->sock, args->tasks[my_index].probe.addr, my_index); // Call the function with the task ID and probe address
+        args->tasks[my_index].function(args->local_ip, args->sock, args->tasks[my_index].probe.addr, my_index);
         args->tasks[my_index].status = SENT;
-        finish_time = time(NULL);// we start the timeout when the last task is sent
     }
-    if (pthread_mutex_trylock(&queue_mutex) == 0) {
+
+    //Dedicated thread (the one that sent the last task) handle the responses until the timeout
+    if (is_receiver) {
+        printf("[*] All tasks sent. Waiting for responses...\n");
         bool check_message = true;
-        while (check_message || (TIMEOUT - (time(NULL) - finish_time)) > 0) {
-            //printf("Checking for answers in worker thread\n");
+        while (check_message || (time(NULL) - args->finish_time) < TIMEOUT) {
             check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
         }
-        printf("[*] No more tasks to process, exiting thread\n");
+        //for some reason if we add a sleep here we miss some responses
+        printf("[*] Receiver thread finished.\n");
     }
-    pthread_mutex_unlock(&queue_mutex);
-    printf("Thread finished\n");
     return NULL;
 }
 
@@ -366,6 +368,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     args.task_index = 0;
+    args.all_tasks_sent = false;
+    args.finish_time = 0;
     for (int i = 0; i < num_threads; ++i) {
         int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {

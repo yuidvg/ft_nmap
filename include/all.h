@@ -72,6 +72,8 @@ typedef struct  s_thread_args {
     char            local_ip[INET_ADDRSTRLEN];;
     uint16_t        task_index;
     uint16_t        num_tasks;
+    bool            all_tasks_sent;
+    time_t          finish_time;
 }               t_thread_args;
 
 // Used for the checksum calculation
@@ -117,5 +119,4 @@ build_probes
     Improve the way we handle timeouts (currently we're waiting until the last possible time, despite the fast that the last signal sent may have been answered already)
     Improve setup_filter to be more specific
     Improve error handling (errbuf, malloc returns, etc.)
-    change types to be more specific (e.g. use uint16_t, ...)
 */
