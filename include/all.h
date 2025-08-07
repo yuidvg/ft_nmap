@@ -22,6 +22,7 @@
 // External libraries
 # include <pcap.h>
 # include <pthread.h>
+# include <../libft/libft.h>
 
 # define TIMEOUT 2
 
@@ -52,8 +53,8 @@ typedef enum    e_result {
 }               t_result;
 
 typedef struct  s_probe {
-    t_scan_types   scan_type; // Type of scan to perform
-    struct sockaddr_in addr;   // Address to scan
+    t_scan_types   scan_type;   // Type of scan to perform
+    struct sockaddr_in addr;    // Address to scan
 }               t_probe;
 
 typedef struct  s_task {
@@ -85,34 +86,31 @@ typedef struct s_pseudo_header {
     uint16_t tcp_length;
 }               t_pseudo_header;
 
+//print.c
+void print_results(const t_task *tasks, const uint16_t num_tasks);
+
+//receive.c
+void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks);
+bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks);
+
+//send.c
+unsigned short checksum(unsigned short *ptr, int nbytes);
+void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+
+//setup.c
+int get_local_ip_and_iface(char *iface, char *ip);
+int setup_socket();
+pcap_t *setup_handle(const char *iface);
+void setup_filter(pcap_t *handle);
+
+//main.c
+t_task *build_tasks(const t_probe *probes, const uint16_t num_probes);
+void *worker(void *arg);
+
+//TEMPORARY
+t_probe *build_probes(const char *target, const t_scan_types scan_type, uint16_t base_port, uint16_t num_ports);
+
 #endif
-
-/*
-//CORE
-    main
-    worker
-    build_tasks
-
-//SETUP SCAN
-    setup_socket
-    get_local_ip_and_iface
-    setup_handle
-    setup_filter
-
-//SENDING
-checksum
-send_syn_packet
-
-//RECEIVING
-check_for_answer
-handle_packet
-
-//PRINTS
-    print_results
-
-//tmp
-build_probes
-*/
 
 /*
 ////TODO
