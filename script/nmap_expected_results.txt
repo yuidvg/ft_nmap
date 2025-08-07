@@ -1,0 +1,27 @@
+[root@nixos:/workspace]# sh script/nmap_all.sh 80 scanme.nmap.org
+80/tcp open  http
+80/tcp closed http
+80/tcp unfiltered http
+80/tcp closed http
+80/tcp closed http
+
+[root@nixos:/workspace]# sh script/nmap_all.sh 81 scanme.nmap.org
+81/tcp closed hosts2-ns
+81/tcp closed hosts2-ns
+81/tcp unfiltered hosts2-ns
+81/tcp closed hosts2-ns
+81/tcp closed hosts2-ns
+
+[root@nixos:/workspace]# sh script/nmap_all.sh 443 8.8.8.8
+443/tcp open  https
+443/tcp closed https
+443/tcp unfiltered https
+443/tcp closed https
+443/tcp closed https
+
+[root@nixos:/workspace]# sh script/nmap_all.sh 444 8.8.8.8
+444/tcp filtered snpp
+444/tcp closed snpp
+444/tcp unfiltered snpp
+444/tcp closed snpp
+444/tcp closed snpp

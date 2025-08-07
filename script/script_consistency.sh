@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 RES_DIR="$DIR/res"
 
 mkdir -p "$RES_DIR"
-cp "$DIR/correct_output.txt" "$RES_DIR/correct_output.txt"
+cp "$DIR/consistency_correct_output.txt" "$RES_DIR/correct_output.txt"
 
 sudo "$DIR/../build/bin/ft_nmap" $NUM_THREADS > "$RES_DIR/1output.txt"
 sudo "$DIR/../build/bin/ft_nmap" $NUM_THREADS > "$RES_DIR/2output.txt"
