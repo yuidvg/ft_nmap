@@ -2,6 +2,32 @@
 
 #include "macro.h"
 
+typedef enum e_task_status
+{
+    DEFAULT,
+    CREATED,
+    SENT,
+    COMPLETED
+} t_task_status;
+
+typedef enum e_result
+{
+    FILTERED,
+    OPEN,
+    CLOSED,
+    UNEXPECTED
+} t_result;
+
+// Used for the checksum calculation
+typedef struct s_pseudo_header
+{
+    uint32_t src;
+    uint32_t dst;
+    uint8_t reserved;
+    uint8_t protocol;
+    uint16_t tcp_length;
+} t_pseudo_header;
+
 typedef enum
 {
     SCAN_TYPE_SYN = 1 << 0,
@@ -32,13 +58,33 @@ typedef struct
 
 typedef struct
 {
-    const char *const host;
-    const int port;
-    const scan_type_t scan_type;
+    scan_type_t scan_type;
+    struct sockaddr_in address;
 } probe_t;
 
-typedef struct
+typedef struct s_task
 {
-    struct sockaddr_in sockaddr;
-    scan_type_t scan_type;
-} probe_info_t;
+    probe_t probe;
+    t_task_status status;
+    t_result result;
+    time_t start;
+    void (*function)(const char *, int, struct sockaddr_in, uint16_t);
+} t_task;
+
+#ifndef IFNAMSIZ
+#define IFNAMSIZ 16
+#endif
+
+typedef struct s_thread_args
+{
+    t_task *tasks;
+    int sock;
+    pcap_t *handle;
+    char iface[IFNAMSIZ]; // might not be necessary to be here
+    char local_ip[INET_ADDRSTRLEN];
+    ;
+    uint16_t task_index;
+    uint16_t num_tasks;
+    bool all_tasks_sent;
+    time_t finish_time;
+} t_thread_args;

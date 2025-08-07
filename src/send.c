@@ -1,4 +1,4 @@
-# include <../include/all.h>
+# include "internal.h"
 
 // Checksum function - verify if the content was corrupted
 unsigned short checksum(unsigned short *ptr, int nbytes) {
@@ -25,7 +25,7 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
     const uint16_t port = test.sin_port; // Get the port from the probe
     // Allocate only as much as needed for headers
     char packet[sizeof(struct ip) + sizeof(struct tcphdr)]; // The size is just was we need for the headers
-    ft_memset(packet, 0, sizeof(packet));
+    memset(packet, 0, sizeof(packet));
     struct ip *const iph = (struct ip *) packet;
     struct tcphdr *const tcph = (struct tcphdr *) (packet + sizeof(struct ip));
 
@@ -70,9 +70,9 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
 
     // Create a pseudo packet - Pseudo header + TCP header
     char pseudo_packet[sizeof(t_pseudo_header) + sizeof(struct tcphdr)];
-    ft_memset(pseudo_packet, 0, sizeof(pseudo_packet));                    // Initialization
-    ft_memcpy(pseudo_packet, &psh, sizeof(psh));                           // Copy the pseudo header into the pseudo packet
-    ft_memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));   // Append the TCP header
+    memset(pseudo_packet, 0, sizeof(pseudo_packet));                    // Initialization
+    memcpy(pseudo_packet, &psh, sizeof(psh));                           // Copy the pseudo header into the pseudo packet
+    memcpy(pseudo_packet + sizeof(psh), tcph, sizeof(struct tcphdr));   // Append the TCP header
 
     tcph->th_sum = 0;
     tcph->th_sum = checksum((unsigned short *)pseudo_packet, sizeof(psh) + sizeof(struct tcphdr));
@@ -88,6 +88,6 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
         exit(EXIT_FAILURE);
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
-    //sleep 1 ms 
+    //sleep 1 ms
     usleep(100);//removing this line causes the program to miss some responses when there are threads
 }

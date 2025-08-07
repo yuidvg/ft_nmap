@@ -13,3 +13,10 @@
 #define INIT_ARRAY_ELEMENT(array, index) .array[index] = array[index]
 
 #define SCAN_TYPE_INDEX_2SCAN_TYPE(index) 1 << index
+
+
+# define DEBUG 0
+
+# ifndef TIMEOUT
+#  define TIMEOUT 2
+# endif

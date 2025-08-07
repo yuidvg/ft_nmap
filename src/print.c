@@ -40,6 +40,6 @@ void print_results(const t_task *tasks, const uint16_t num_tasks) {
             default:
                 result_str = "ERROR     ";
         }
-        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.address.sin_addr), ntohs(tasks[i].probe.address.sin_port));
     }
 }

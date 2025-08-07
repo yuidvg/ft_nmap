@@ -1,4 +1,4 @@
-# include <../include/all.h>
+# include "internal.h"
 
 // Get the default interface and IP
 int get_local_ip_and_iface(char *iface, char *ip) {
@@ -10,7 +10,7 @@ int get_local_ip_and_iface(char *iface, char *ip) {
         family = ifa->ifa_addr->sa_family;                              // Check if the address is ipv4, ipv6, etc...
         if ((family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK)) {  // Select one that's ipv4, excluding the loopback interface
             //stores the ip and interface in iface and ip (after).
-            ft_strcpy(iface, ifa->ifa_name);
+            strcpy(iface, ifa->ifa_name);
             getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ip, INET_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
             freeifaddrs(ifaddr);                                        // Free the result of getifaddrs()//NEED to check that the free was successful
             return 0;

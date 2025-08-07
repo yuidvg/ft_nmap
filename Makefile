@@ -7,7 +7,7 @@ CC = clang
 # `pthread` has no .pc file on most Linux systems, so we use the
 # compiler-provided `-pthread` switch instead.
 CFLAGS_LIBRARIES = $(shell pkg-config --cflags libpcap)
-CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES) -fblocks -isystem $(shell $(CC) -print-file-name=include) # Make cc include explicit
+CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES) -isystem $(shell $(CC) -print-file-name=include) # Make cc include explicit
 CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
 LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap) -lc
 LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
@@ -64,7 +64,7 @@ TEST_DEP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(TEST_DEP_SRC))
 
 # App
 APP_BIN = $(BIN_DIR)/ft_nmap
-APP_INCLUDE = include
+APP_INCLUDE = include -Isrc
 
 APP_OBJ_DIR = $(OBJ_DIR)/src
 APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
@@ -129,10 +129,9 @@ debug-test: $(TEST_BIN)
 
 clean:
 	rm -rf $(DEBUG_BIN) $(DEBUG_OBJ) $(TEST_BIN) $(TEST_OBJ) $(APP_BIN) $(APP_OBJ)
-	$(MAKE) -C $(LIBFT_DIR) fclean
 
 re: clean
-	$(MAKE) all
+	$(MAKE) -j all
 
 vm-up:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
@@ -142,6 +141,8 @@ vm-up:
 	fi
 
 vm-clean:
+	@pkill -f "2223" || true
+	@lsof -ti:2223 | xargs -r kill -9 || true
 	rm -rf ./nixos.qcow2 ./result
 
 vm-restart: vm-clean vm-up

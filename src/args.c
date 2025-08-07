@@ -2330,7 +2330,7 @@ static size_t count_ports(const int ports[PORTS_MAX])
     return count;
 }
 
-static size_t count_scan_types(const scan_type_t scan_type)
+static size_t counscan_type_t(const scan_type_t scan_type)
 {
     if (scan_type == SCAN_TYPE_ALL)
     {
@@ -2339,14 +2339,14 @@ static size_t count_scan_types(const scan_type_t scan_type)
     return 1;
 }
 
-probe_info_t *config2probe_infos(const ft_nmap_config_t config)
+probe_t *config2probe_infos(const ft_nmap_config_t config)
 {
     const size_t num_ip_addresses = count_ip_addresses(config.ip_addresses);
     const size_t num_ports = count_ports(config.ports);
-    const size_t num_scan_types = count_scan_types(config.scan_type);
+    const size_t num_scan_types = counscan_type_t(config.scan_type);
 
     const size_t total_probes = num_ip_addresses * num_ports * num_scan_types;
-    probe_info_t *probe_infos = malloc((total_probes + 1) * sizeof(probe_info_t));
+    probe_t *probe_infos = malloc((total_probes + 1) * sizeof(probe_t));
 
     for (size_t ip_idx = 0; ip_idx < num_ip_addresses; ++ip_idx)
     {
@@ -2359,7 +2359,7 @@ probe_info_t *config2probe_infos(const ft_nmap_config_t config)
                 if (num_scan_types == 1)
                 {
                     probe_infos[probe_index] =
-                        (probe_info_t){.sockaddr =
+                        (probe_t){.address =
                                            {
                                                .sin_family = AF_INET,
                                                .sin_port = htons(config.ports[port_idx]),
@@ -2370,7 +2370,7 @@ probe_info_t *config2probe_infos(const ft_nmap_config_t config)
                 else
                 {
                     probe_infos[probe_index] =
-                        (probe_info_t){.sockaddr =
+                        (probe_t){.address =
                                            {
                                                .sin_family = AF_INET,
                                                .sin_port = htons(config.ports[port_idx]),
@@ -2382,11 +2382,11 @@ probe_info_t *config2probe_infos(const ft_nmap_config_t config)
         }
     }
     probe_infos[total_probes] =
-        (probe_info_t){.sockaddr = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {.s_addr = 0}}, .scan_type = 0};
+        (probe_t){.address = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {.s_addr = 0}}, .scan_type = 0};
     return probe_infos;
 }
 
-size_t count_probe_infos(const probe_info_t *const probe_infos)
+size_t count_probe_infos(const probe_t *const probe_infos)
 {
     size_t count = 0;
     for (size_t i = 0; probe_infos[i].scan_type != 0; ++i)
