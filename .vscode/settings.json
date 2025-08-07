@@ -13,5 +13,5 @@
         "cstddef": "c",
         "memory_resource": "c",
         "random": "c"
-    },
+    }
 }

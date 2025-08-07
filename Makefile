@@ -2,11 +2,33 @@ ifeq ($(HOSTTYPE),)
 HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
-CC = gcc
+CC = clang
+# Pkg-config gives us the proper include/lib flags for libpcap –
+# `pthread` has no .pc file on most Linux systems, so we use the
+# compiler-provided `-pthread` switch instead.
+CFLAGS_LIBRARIES = $(shell pkg-config --cflags libpcap)
+CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES) -fblocks -isystem $(shell $(CC) -print-file-name=include) # Make cc include explicit
+CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
+LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap) -lc
+LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
+LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g -fsanitize=address
 
-PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
-PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
-PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
+# Hook malloc
+HOOK_DIR = hook
+HOOK_SRC = $(wildcard $(HOOK_DIR)/*.c)
+HOOK_OBJ_DIR = $(OBJ_DIR)/hook
+HOOK_OBJ = $(patsubst $(HOOK_DIR)/%.c,$(HOOK_OBJ_DIR)/%.o,$(HOOK_SRC))
+
+# Hook shared library
+ifeq ($(shell uname -s),Darwin)
+HOOK_LIB = $(BIN_DIR)/libhook.dylib
+HOOK_LDFLAGS = -dynamiclib -fPIC \
+               -current_version 1.0 -compatibility_version 1.0 \
+               -undefined dynamic_lookup
+else
+HOOK_LIB = $(BIN_DIR)/libhook.so
+HOOK_LDFLAGS = -shared -fPIC
+endif
 
 CFLAGS_COMMON = -Wall -Wextra -Werror -pthread $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
 CFLAGS_DEBUG = -g -O0
@@ -34,7 +56,11 @@ TEST_OBJ_DIR = $(OBJ_DIR)/test
 TEST_OBJ = $(patsubst $(TEST_DIR)/%.c,$(TEST_OBJ_DIR)/%.o,$(TEST_SRC))
 
 TEST_DIR = test
-TEST_SRC = $(TEST_DIR)/test.c $(TEST_DIR)/munit.c
+TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
+
+# Test dependencies - need memory.c and error.c for tests
+TEST_DEP_SRC = $(APP_DIR)/memory.c $(APP_DIR)/error.c
+TEST_DEP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(TEST_DEP_SRC))
 
 # App
 APP_BIN = $(BIN_DIR)/ft_nmap
@@ -46,18 +72,48 @@ APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
 APP_DIR = src
 APP_SRC = $(wildcard $(APP_DIR)/*.c)
 
-# Libft
-LIBFT_DIR = libft
-LIBFT_BIN = $(LIBFT_DIR)/libft.a
-LIBFT_INCLUDE = $(LIBFT_DIR)/include
-LIBFT_SRC = $(wildcard $(LIBFT_DIR)/*.c)
-
+# All
+ALL_INCLUDE = $(APP_INCLUDE)
+ALL_BIN = $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN) $(HOOK_LIB)
+ALL_OBJ = $(APP_OBJ) $(DEBUG_OBJ) $(TEST_OBJ) $(HOOK_OBJ)
 
 #-----------------------------------------------------------------------------------------------------------#
-# Rules
-#-----------------------------------------------------------------------------------------------------------#
 
-app: $(APP_BIN)
+app: $(APP_BIN) $(HOOK_LIB)
+
+
+# Hook library
+# Link
+$(HOOK_LIB): $(HOOK_OBJ)
+	$(CC) $(HOOK_LDFLAGS) -o $@ $(HOOK_OBJ)
+# Compile
+$(HOOK_OBJ): $(HOOK_OBJ_DIR)/%.o: $(HOOK_DIR)/%.c
+	$(CC) $(CFLAGS_RELEASE) -c $< -o $@
+
+# App
+# Link
+$(APP_BIN): $(HOOK_OBJ) $(APP_OBJ)
+	$(CC) $(LDFLAGS_RELEASE) -o $@ $(APP_OBJ)
+# Compile
+$(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
+	$(CC) $(CFLAGS_RELEASE)  -c $< -o $@
+
+# Debug
+# Link
+$(DEBUG_BIN): $(DEBUG_OBJ)
+	$(CC) $(LDFLAGS_DEBUG) -o $@ $(DEBUG_OBJ)
+# Compile
+$(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
+	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
+
+# Tests
+# Link
+$(TEST_BIN): $(TEST_OBJ) $(TEST_DEP_OBJ)
+	$(CC) $(LDFLAGS_DEBUG) -o $@ $(TEST_OBJ) $(TEST_DEP_OBJ)
+# Compile
+$(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
+	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
+
 
 debug: $(DEBUG_BIN)
 
@@ -90,27 +146,5 @@ vm-clean:
 
 vm-restart: vm-clean vm-up
 .PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
-
-# Debug
-$(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft -lpcap
-$(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
-	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
-
-# Tests
-$(TEST_BIN): $(TEST_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(TEST_OBJ) -L$(LIBFT_DIR) -lft -lpcap
-$(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
-	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
-
-# App
-$(APP_BIN): $(LIBFT_BIN) $(APP_OBJ)
-	$(CC) $(CFLAGS) -o $@ $(APP_OBJ) -L$(LIBFT_DIR) -lft -lpcap
-$(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
-	$(CC) $(CFLAGS) -I$(APP_INCLUDE) -I$(LIBFT_INCLUDE) -c $< -o $@
-
-# Libft
-$(LIBFT_BIN):
-	$(MAKE) -C $(LIBFT_DIR)
 
 #-----------------------------------------------------------------------------------------------------------#

@@ -45,9 +45,9 @@ typedef struct
 {
     const size_t length;
     const int   *data;
-} Const_int_array;
+} const_int_array_t;
 
-double average(const Const_int_array numbers)
+double average(const const_int_array_t numbers)
 {
     const int sum = sum_three(numbers.data[0],
                               numbers.data[1],
@@ -64,19 +64,19 @@ typedef struct
 {
     const bool succeeded;
     const int  result;
-} Result_int;
+} result_int_t;
 ```
 
 ---
 
 #### 6. Always wrap syscalls
 ```c
-typedef struct { const bool succeeded; const int result; } Result_fd;
+typedef struct { const bool succeeded; const int result; } result_fd_t;
 
-Result_fd open_file_read_only(const char *const path)
+result_fd_t open_file_read_only(const char *const path)
 {
     const int fd = open(path, O_RDONLY);
-    return (Result_fd){
+    return (result_fd_t){
         .succeeded = (fd != -1),
         .result    = (fd != -1) ? fd : -errno
     };
@@ -87,7 +87,7 @@ Result_fd open_file_read_only(const char *const path)
 
 #### 7. Canonical function skeleton
 ```c
-int some_function(const size_t a, const Some_type b)
+int some_function(const size_t a, const some_type_t b)
 {
     const int    value_a = other_function(a);
     const size_t value_b = other_function(b);
@@ -165,7 +165,7 @@ bool is_size_overflowed(const size_t size)
 2. `const` **everywhere** (rare, scoped exceptions allowed).
 3. **Never** re-assign an existing identifier.
 4. Pass **all** data via parameters.
-5. Wrap **all** side-effects in `Result…` structs.
+5. Wrap **all** side-effects in `result_t…` structs.
 6. Follow the **function skeleton** format.
 7. snake_case
 8. **Single exit point**: express flow with `if / else if / else`, no early returns.

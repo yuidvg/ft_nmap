@@ -1,14 +1,13 @@
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "ft_nmap",
+            "compilerPath": "gcc",
             "includePath": [
                 "${workspaceFolder}/**"
-            ],
+                        ],
             "defines": [],
-            "cStandard": "c17",
-            "cppStandard": "gnu++17",
-            "intelliSenseMode": "linux-gcc-arm64"
+            "cStandard": "c23"
         }
     ],
     "version": 4
