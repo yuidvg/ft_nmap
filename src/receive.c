@@ -1,5 +1,50 @@
 # include <../include/all.h>
 
+void parse_syn(t_task *task, const struct tcphdr *rtcp) {
+    if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
+        if (DEBUG) printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
+        task->result = OPEN;
+    } else if (rtcp->th_flags & TH_RST) {
+        if (DEBUG) printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
+        task->result = CLOSED;
+    } else {
+        if (DEBUG) printf("[?] Port %d is UNEXPECTED\n", ntohs(rtcp->th_sport));
+        task->result = UNEXPECTED;
+    }
+}
+
+void parse_null(t_task *task, const struct tcphdr *rtcp) {
+    if (rtcp->th_flags & TH_RST) {
+        task->result = CLOSED;
+    } else {
+        task->result = OPEN; // CHANGE?
+    }
+}
+
+void parse_ack(t_task *task, const struct tcphdr *rtcp) {
+    if (rtcp->th_flags & TH_RST) {
+        task->result = UNFILTERED;
+    } else {
+        task->result = FILTERED;
+    }
+}
+
+void parse_fin(t_task *task, const struct tcphdr *rtcp) {
+    if (rtcp->th_flags & TH_RST) {
+        task->result = CLOSED;
+    } else {
+        task->result = OPEN; // CHANGE?
+    }
+}
+
+void parse_xmas(t_task *task, const struct tcphdr *rtcp) {
+    if (rtcp->th_flags & TH_RST) {
+        task->result = CLOSED;
+    } else {
+        task->result = OPEN; // CHANGE?
+    }
+}
+
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) {
     //printf("[*] Handling packet...\n");
     const struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
@@ -19,15 +64,24 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
                 return;
             }
             if (DEBUG) printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
-            if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
-                if (DEBUG) printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
-                tasks[i].result = OPEN;
-            } else if (rtcp->th_flags & TH_RST) {
-                if (DEBUG) printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
-                tasks[i].result = CLOSED;
-            } else {
-                if (DEBUG) printf("[?] Port %d is UNEXPECTED\n", ntohs(rtcp->th_sport));
-                tasks[i].result = UNEXPECTED;
+            switch (tasks[i].scan_type) {
+                case SYN:
+                    parse_syn(&tasks[i], rtcp);
+                    break;
+                case NUL:
+                    parse_null(&tasks[i], rtcp); // Implement this function
+                    break;
+                case ACK:
+                    parse_ack(&tasks[i], rtcp); // Implement this function
+                    break;
+                case FIN:
+                    parse_fin(&tasks[i], rtcp); // Implement this function
+                    break;
+                case XMAS:
+                    parse_xmas(&tasks[i], rtcp); // Implement this function
+                    break;
+                default:
+                    fprintf(stderr, "Unknown scan type for task %d\n", i);
             }
             tasks[i].status = COMPLETED;
             break;

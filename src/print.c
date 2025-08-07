@@ -1,5 +1,23 @@
 # include <../include/all.h>
 
+char *print_scan_type(const t_scan_types scan_type) {
+    switch (scan_type) {
+        case SYN:
+            return "SYN";
+        case NUL:
+            return "NUL";
+        case ACK:
+            return "ACK";
+        case FIN:
+            return "FIN";
+        case XMAS:
+            return "XMAS";
+        default:
+            return "UNKNOWN";
+    }
+}
+            
+
 void print_results(const t_task *tasks, const uint16_t num_tasks) {
     printf("[*] Scan results:\n");
     for (uint16_t i = 0; i < num_tasks; i++) {
@@ -14,9 +32,13 @@ void print_results(const t_task *tasks, const uint16_t num_tasks) {
             case FILTERED:
                 result_str = "FILTERED  ";
                 break;
+            case UNFILTERED:
+                result_str = "UNFILTERED";
+                break;
             default:
                 result_str = "ERROR     ";
         }
-        printf("%s | %s %d\n", result_str, inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+        printf("%s | %s %s %d\n", result_str, print_scan_type(tasks[i].scan_type), inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+        if (i % 5 == 4) { printf("\n"); } // TEMP
     }
 }

@@ -23,7 +23,7 @@
 # include <pthread.h>
 # include <../libft/libft.h>
 
-# define DEBUG 0
+# define DEBUG 1
 
 # ifndef TIMEOUT
 #  define TIMEOUT 2
@@ -52,6 +52,7 @@ typedef enum    e_result {
     FILTERED,
     OPEN,
     CLOSED,
+    UNFILTERED,
     UNEXPECTED
 }               t_result;
 
@@ -65,6 +66,7 @@ typedef struct  s_task {
     t_task_status   status;
     t_result        result;
     time_t          start;
+    t_scan_types    scan_type;
     void            (*function)(const char*, int, struct sockaddr_in, uint16_t);
 }               t_task;
 
@@ -99,6 +101,11 @@ bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks);
 //send.c
 unsigned short checksum(unsigned short *ptr, int nbytes);
 void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+void send_null_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+void send_ack_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+void send_fin_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+void send_xmas_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+
 
 //setup.c
 int get_local_ip_and_iface(char *iface, char *ip);
