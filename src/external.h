@@ -1,7 +1,5 @@
 #pragma once
 
-#define _GNU_SOURCE
-
 #include <sys/types.h>
 
 // BSD-style type definitions for libpcap compatibility

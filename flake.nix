@@ -99,7 +99,7 @@
               password = "a";
             };
             # Set zsh as the login shell for all users
-            users.defaultUserShell = "/run/current-system/sw/bin/zsh";
+            # users.defaultUserShell = "/run/current-system/sw/bin/zsh";
 
             #System Wide Services
             environment = {

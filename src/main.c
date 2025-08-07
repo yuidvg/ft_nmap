@@ -25,38 +25,23 @@ int main(int argc, char *argv[])
         }
     }
     ft_nmap_config_t config = args2config(command_line_args);
-    const probe_t *const probe_infos = config2probe_infos(config);
+    const probe_t *const probes = config2probe_infos(config);
 
     /* Print probe_infos for debugging/verification */
     printf("\nProbe infos:\n");
 
-    for (size_t i = 0; probe_infos[i].scan_type != 0; ++i)
+    for (size_t i = 0; probes[i].scan_type != 0; ++i)
     {
-        const probe_t probe = probe_infos[i];
+        const probe_t probe = probes[i];
         const char *const ip_str = inet_ntoa(probe.address.sin_addr);
         const int port = ntohs(probe.address.sin_port);
 
         printf("  [%zu]: %s:%d (scan_type: %s)\n", i, ip_str, port, scan_type2str(probe.scan_type));
     }
 
-    // TEMPORARY PARSING
-    if (argc != 2)
-    {
-        fprintf(stderr, "Need one arg\n");
-        return 1;
-    }
-
-    const int num_threads = atoi(argv[1]);
-    if (num_threads < 0)
-    {
-        fprintf(stderr, "Number of threads must be a >= to 0\n");
-        return 1;
-    }
-
     // SETUP
     t_thread_args args;
-    args.num_tasks = 50; // TEMPORARY
-    const probe_t *probes = build_probes(args.num_tasks);
+    args.num_tasks = count_probes(probes);
     if (DEBUG)
         printf("[*] Created %d probes\n", args.num_tasks);
 
@@ -76,7 +61,7 @@ int main(int argc, char *argv[])
 
     // SENDING (AND RECEIVING) THE PACKETS
 
-    pthread_t *threads = malloc((num_threads) * (sizeof(pthread_t)));
+    pthread_t *threads = malloc((config.number_of_threads) * (sizeof(pthread_t)));
     if (!threads)
     {
         printf("Failed to allocate memory for threads\n");
@@ -86,8 +71,8 @@ int main(int argc, char *argv[])
     args.all_tasks_sent = false;
     args.finish_time = 0;
     if (DEBUG)
-        printf("[*] Starting %d threads...\n", num_threads);
-    for (int i = 0; i < num_threads; ++i)
+        printf("[*] Starting %d threads...\n", config.number_of_threads);
+    for (int i = 0; i < config.number_of_threads; ++i)
     {
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0)
@@ -97,7 +82,7 @@ int main(int argc, char *argv[])
         }
     }
     worker((void *)&args);
-    for (int i = 0; i < num_threads; ++i)
+    for (int i = 0; i < config.number_of_threads; ++i)
     {
         pthread_join(threads[i], NULL);
     }
