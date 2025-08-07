@@ -12,3 +12,4 @@
 /* Macro for initializing fixed-length arrays in immutable structs */
 #define INIT_ARRAY_ELEMENT(array, index) .array[index] = array[index]
 
+#define SCAN_TYPE_INDEX_2SCAN_TYPE(index) 1 << index

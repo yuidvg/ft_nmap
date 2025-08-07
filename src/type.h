@@ -36,3 +36,9 @@ typedef struct
     const int port;
     const scan_type_t scan_type;
 } probe_t;
+
+typedef struct
+{
+    struct sockaddr_in sockaddr;
+    scan_type_t scan_type;
+} probe_info_t;

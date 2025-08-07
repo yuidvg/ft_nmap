@@ -1,6 +1,9 @@
 #include "internal.h"
+#include "macro.h"
+#include "type.h"
+#include <stdlib.h>
 
-static bool is_number[[gnu::unused]](const char *const s)
+static bool is_number(const char *const s)
 {
     const char *p = s;
     while (*p != '\0')
@@ -14,7 +17,7 @@ static bool is_number[[gnu::unused]](const char *const s)
     return (p != s);
 }
 
-static bool is_valid_port[[gnu::unused]](const char *const port_str)
+static bool is_valid_port(const char *const port_str)
 {
     return is_number(port_str) && atoi(port_str) > 0 && atoi(port_str) <= 65535;
 }
@@ -22,65 +25,57 @@ static bool is_valid_port[[gnu::unused]](const char *const port_str)
 /* Helper function to parse port ranges and individual ports */
 static void parse_port_string(const char *const port_str, int ports_out[PORTS_MAX])
 {
-    char *const ports_copy = strdup(port_str);
-    if (ports_copy != NULL)
+    char **port_ranges = ft_split_or_exit(port_str, ',');
+    if (port_ranges != nullptr)
     {
-        char **port_ranges = ft_split_or_exit(ports_copy, ',');
-        if (port_ranges != nullptr)
+        size_t port_index = 0;
+        for (size_t i = 0; port_ranges[i] != nullptr; i++)
         {
-            size_t port_count = 0;
-            for (size_t i = 0; port_ranges[i] != nullptr; i++)
+            char *const dash_position = strchr(port_ranges[i], '-');
+            if (dash_position != nullptr)
+            // range
             {
-                char *const dash_position = strchr(port_ranges[i], '-');
-                if (dash_position != nullptr)
-                // range
+                *dash_position = '\0';
+                const char *const range_start_string = port_ranges[i];
+                const char *const range_end_string = dash_position + 1;
+
+                if (is_valid_port(range_start_string) && is_valid_port(range_end_string))
                 {
-                    *dash_position = '\0';
-                    const char *const range_start_string = port_ranges[i];
-                    const char *const range_end_string = dash_position + 1;
+                    const int start_port = atoi(range_start_string);
+                    const int end_port = atoi(range_end_string);
 
-                    if (is_number(range_start_string) && is_number(range_end_string))
+                    for (int port = start_port; port <= end_port && port_index < PORTS_MAX; ++port)
                     {
-                        const int start_port = atoi(range_start_string);
-                        const int end_port = atoi(range_end_string);
-
-                        for (int port = start_port; port <= end_port && port_count < PORTS_MAX; ++port)
+                        ports_out[port_index++] = port;
+                        if (port_index >= PORTS_MAX)
                         {
-                            if (port > 0 && port <= 65535)
-                            {
-                                ports_out[port_count++] = port;
-                            }
+                            print_error_and_exit("Too many ports");
                         }
-                    }
-                    else
-                    {
-                        print_error_and_exit("Invalid port range");
                     }
                 }
                 else
-                // single port
                 {
-                    if (is_number(port_ranges[i]))
+                    print_error_and_exit("Invalid port range");
+                }
+            }
+            else
+            // single port
+            {
+                if (is_valid_port(port_ranges[i]))
+                {
+                    const int port = atoi(port_ranges[i]);
+                    ports_out[port_index++] = port;
+                    if (port_index >= PORTS_MAX)
                     {
-                        const int port = atoi(port_ranges[i]);
-                        if (port > 0 && port <= 65535)
-                        {
-                            ports_out[port_count++] = port;
-                        }
+                        print_error_and_exit("Too many ports");
                     }
-                    else
-                    {
-                        print_error_and_exit("Invalid port");
-                    }
+                }
+                else
+                {
+                    print_error_and_exit("Invalid port");
                 }
             }
         }
-
-        free(ports_copy);
-    }
-    else
-    {
-        return; /* Memory allocation failed */
     }
 }
 
@@ -195,7 +190,7 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
             break;
 
         case '?':
-            exit(EXIT_FAILURE);
+            print_help_and_exit();
             break;
 
         default:
@@ -1237,4 +1232,1166 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
     };
 
     return args;
+}
+
+static void filename2ip_addresses(const char *const filename, const char *ip_addresses[IP_ADDRESSES_MAX])
+{
+    FILE *file = fopen(filename, "r");
+    if (file != nullptr)
+    {
+        char line[IP_ADDRESSES_MAX];
+        int index = 0;
+
+        while (fgets(line, sizeof(line), file) != NULL && index < IP_ADDRESSES_MAX)
+        {
+            const size_t len = strlen(line);
+            if (len > 0 && line[len - 1] == '\n')
+            {
+                line[len - 1] = '\0';
+            }
+
+            if (strlen(line) > 0)
+            {
+                ip_addresses[index] = strdup(line);
+                index++;
+            }
+        }
+        fclose(file);
+    }
+    else
+    {
+        print_error_and_exit("Failed to open file");
+    }
+}
+
+ft_nmap_config_t args2config(const ft_nmap_args_t args)
+{
+    ft_nmap_config_t config = {
+        .ports[0] = args.ports[0],
+        .ports[1] = args.ports[1],
+        .ports[2] = args.ports[2],
+        .ports[3] = args.ports[3],
+        .ports[4] = args.ports[4],
+        .ports[5] = args.ports[5],
+        .ports[6] = args.ports[6],
+        .ports[7] = args.ports[7],
+        .ports[8] = args.ports[8],
+        .ports[9] = args.ports[9],
+        .ports[10] = args.ports[10],
+        .ports[11] = args.ports[11],
+        .ports[12] = args.ports[12],
+        .ports[13] = args.ports[13],
+        .ports[14] = args.ports[14],
+        .ports[15] = args.ports[15],
+        .ports[16] = args.ports[16],
+        .ports[17] = args.ports[17],
+        .ports[18] = args.ports[18],
+        .ports[19] = args.ports[19],
+        .ports[20] = args.ports[20],
+        .ports[21] = args.ports[21],
+        .ports[22] = args.ports[22],
+        .ports[23] = args.ports[23],
+        .ports[24] = args.ports[24],
+        .ports[25] = args.ports[25],
+        .ports[26] = args.ports[26],
+        .ports[27] = args.ports[27],
+        .ports[28] = args.ports[28],
+        .ports[29] = args.ports[29],
+        .ports[30] = args.ports[30],
+        .ports[31] = args.ports[31],
+        .ports[32] = args.ports[32],
+        .ports[33] = args.ports[33],
+        .ports[34] = args.ports[34],
+        .ports[35] = args.ports[35],
+        .ports[36] = args.ports[36],
+        .ports[37] = args.ports[37],
+        .ports[38] = args.ports[38],
+        .ports[39] = args.ports[39],
+        .ports[40] = args.ports[40],
+        .ports[41] = args.ports[41],
+        .ports[42] = args.ports[42],
+        .ports[43] = args.ports[43],
+        .ports[44] = args.ports[44],
+        .ports[45] = args.ports[45],
+        .ports[46] = args.ports[46],
+        .ports[47] = args.ports[47],
+        .ports[48] = args.ports[48],
+        .ports[49] = args.ports[49],
+        .ports[50] = args.ports[50],
+        .ports[51] = args.ports[51],
+        .ports[52] = args.ports[52],
+        .ports[53] = args.ports[53],
+        .ports[54] = args.ports[54],
+        .ports[55] = args.ports[55],
+        .ports[56] = args.ports[56],
+        .ports[57] = args.ports[57],
+        .ports[58] = args.ports[58],
+        .ports[59] = args.ports[59],
+        .ports[60] = args.ports[60],
+        .ports[61] = args.ports[61],
+        .ports[62] = args.ports[62],
+        .ports[63] = args.ports[63],
+        .ports[64] = args.ports[64],
+        .ports[65] = args.ports[65],
+        .ports[66] = args.ports[66],
+        .ports[67] = args.ports[67],
+        .ports[68] = args.ports[68],
+        .ports[69] = args.ports[69],
+        .ports[70] = args.ports[70],
+        .ports[71] = args.ports[71],
+        .ports[72] = args.ports[72],
+        .ports[73] = args.ports[73],
+        .ports[74] = args.ports[74],
+        .ports[75] = args.ports[75],
+        .ports[76] = args.ports[76],
+        .ports[77] = args.ports[77],
+        .ports[78] = args.ports[78],
+        .ports[79] = args.ports[79],
+        .ports[80] = args.ports[80],
+        .ports[81] = args.ports[81],
+        .ports[82] = args.ports[82],
+        .ports[83] = args.ports[83],
+        .ports[84] = args.ports[84],
+        .ports[85] = args.ports[85],
+        .ports[86] = args.ports[86],
+        .ports[87] = args.ports[87],
+        .ports[88] = args.ports[88],
+        .ports[89] = args.ports[89],
+        .ports[90] = args.ports[90],
+        .ports[91] = args.ports[91],
+        .ports[92] = args.ports[92],
+        .ports[93] = args.ports[93],
+        .ports[94] = args.ports[94],
+        .ports[95] = args.ports[95],
+        .ports[96] = args.ports[96],
+        .ports[97] = args.ports[97],
+        .ports[98] = args.ports[98],
+        .ports[99] = args.ports[99],
+        .ports[100] = args.ports[100],
+        .ports[101] = args.ports[101],
+        .ports[102] = args.ports[102],
+        .ports[103] = args.ports[103],
+        .ports[104] = args.ports[104],
+        .ports[105] = args.ports[105],
+        .ports[106] = args.ports[106],
+        .ports[107] = args.ports[107],
+        .ports[108] = args.ports[108],
+        .ports[109] = args.ports[109],
+        .ports[110] = args.ports[110],
+        .ports[111] = args.ports[111],
+        .ports[112] = args.ports[112],
+        .ports[113] = args.ports[113],
+        .ports[114] = args.ports[114],
+        .ports[115] = args.ports[115],
+        .ports[116] = args.ports[116],
+        .ports[117] = args.ports[117],
+        .ports[118] = args.ports[118],
+        .ports[119] = args.ports[119],
+        .ports[120] = args.ports[120],
+        .ports[121] = args.ports[121],
+        .ports[122] = args.ports[122],
+        .ports[123] = args.ports[123],
+        .ports[124] = args.ports[124],
+        .ports[125] = args.ports[125],
+        .ports[126] = args.ports[126],
+        .ports[127] = args.ports[127],
+        .ports[128] = args.ports[128],
+        .ports[129] = args.ports[129],
+        .ports[130] = args.ports[130],
+        .ports[131] = args.ports[131],
+        .ports[132] = args.ports[132],
+        .ports[133] = args.ports[133],
+        .ports[134] = args.ports[134],
+        .ports[135] = args.ports[135],
+        .ports[136] = args.ports[136],
+        .ports[137] = args.ports[137],
+        .ports[138] = args.ports[138],
+        .ports[139] = args.ports[139],
+        .ports[140] = args.ports[140],
+        .ports[141] = args.ports[141],
+        .ports[142] = args.ports[142],
+        .ports[143] = args.ports[143],
+        .ports[144] = args.ports[144],
+        .ports[145] = args.ports[145],
+        .ports[146] = args.ports[146],
+        .ports[147] = args.ports[147],
+        .ports[148] = args.ports[148],
+        .ports[149] = args.ports[149],
+        .ports[150] = args.ports[150],
+        .ports[151] = args.ports[151],
+        .ports[152] = args.ports[152],
+        .ports[153] = args.ports[153],
+        .ports[154] = args.ports[154],
+        .ports[155] = args.ports[155],
+        .ports[156] = args.ports[156],
+        .ports[157] = args.ports[157],
+        .ports[158] = args.ports[158],
+        .ports[159] = args.ports[159],
+        .ports[160] = args.ports[160],
+        .ports[161] = args.ports[161],
+        .ports[162] = args.ports[162],
+        .ports[163] = args.ports[163],
+        .ports[164] = args.ports[164],
+        .ports[165] = args.ports[165],
+        .ports[166] = args.ports[166],
+        .ports[167] = args.ports[167],
+        .ports[168] = args.ports[168],
+        .ports[169] = args.ports[169],
+        .ports[170] = args.ports[170],
+        .ports[171] = args.ports[171],
+        .ports[172] = args.ports[172],
+        .ports[173] = args.ports[173],
+        .ports[174] = args.ports[174],
+        .ports[175] = args.ports[175],
+        .ports[176] = args.ports[176],
+        .ports[177] = args.ports[177],
+        .ports[178] = args.ports[178],
+        .ports[179] = args.ports[179],
+        .ports[180] = args.ports[180],
+        .ports[181] = args.ports[181],
+        .ports[182] = args.ports[182],
+        .ports[183] = args.ports[183],
+        .ports[184] = args.ports[184],
+        .ports[185] = args.ports[185],
+        .ports[186] = args.ports[186],
+        .ports[187] = args.ports[187],
+        .ports[188] = args.ports[188],
+        .ports[189] = args.ports[189],
+        .ports[190] = args.ports[190],
+        .ports[191] = args.ports[191],
+        .ports[192] = args.ports[192],
+        .ports[193] = args.ports[193],
+        .ports[194] = args.ports[194],
+        .ports[195] = args.ports[195],
+        .ports[196] = args.ports[196],
+        .ports[197] = args.ports[197],
+        .ports[198] = args.ports[198],
+        .ports[199] = args.ports[199],
+        .ports[200] = args.ports[200],
+        .ports[201] = args.ports[201],
+        .ports[202] = args.ports[202],
+        .ports[203] = args.ports[203],
+        .ports[204] = args.ports[204],
+        .ports[205] = args.ports[205],
+        .ports[206] = args.ports[206],
+        .ports[207] = args.ports[207],
+        .ports[208] = args.ports[208],
+        .ports[209] = args.ports[209],
+        .ports[210] = args.ports[210],
+        .ports[211] = args.ports[211],
+        .ports[212] = args.ports[212],
+        .ports[213] = args.ports[213],
+        .ports[214] = args.ports[214],
+        .ports[215] = args.ports[215],
+        .ports[216] = args.ports[216],
+        .ports[217] = args.ports[217],
+        .ports[218] = args.ports[218],
+        .ports[219] = args.ports[219],
+        .ports[220] = args.ports[220],
+        .ports[221] = args.ports[221],
+        .ports[222] = args.ports[222],
+        .ports[223] = args.ports[223],
+        .ports[224] = args.ports[224],
+        .ports[225] = args.ports[225],
+        .ports[226] = args.ports[226],
+        .ports[227] = args.ports[227],
+        .ports[228] = args.ports[228],
+        .ports[229] = args.ports[229],
+        .ports[230] = args.ports[230],
+        .ports[231] = args.ports[231],
+        .ports[232] = args.ports[232],
+        .ports[233] = args.ports[233],
+        .ports[234] = args.ports[234],
+        .ports[235] = args.ports[235],
+        .ports[236] = args.ports[236],
+        .ports[237] = args.ports[237],
+        .ports[238] = args.ports[238],
+        .ports[239] = args.ports[239],
+        .ports[240] = args.ports[240],
+        .ports[241] = args.ports[241],
+        .ports[242] = args.ports[242],
+        .ports[243] = args.ports[243],
+        .ports[244] = args.ports[244],
+        .ports[245] = args.ports[245],
+        .ports[246] = args.ports[246],
+        .ports[247] = args.ports[247],
+        .ports[248] = args.ports[248],
+        .ports[249] = args.ports[249],
+        .ports[250] = args.ports[250],
+        .ports[251] = args.ports[251],
+        .ports[252] = args.ports[252],
+        .ports[253] = args.ports[253],
+        .ports[254] = args.ports[254],
+        .ports[255] = args.ports[255],
+        .ports[256] = args.ports[256],
+        .ports[257] = args.ports[257],
+        .ports[258] = args.ports[258],
+        .ports[259] = args.ports[259],
+        .ports[260] = args.ports[260],
+        .ports[261] = args.ports[261],
+        .ports[262] = args.ports[262],
+        .ports[263] = args.ports[263],
+        .ports[264] = args.ports[264],
+        .ports[265] = args.ports[265],
+        .ports[266] = args.ports[266],
+        .ports[267] = args.ports[267],
+        .ports[268] = args.ports[268],
+        .ports[269] = args.ports[269],
+        .ports[270] = args.ports[270],
+        .ports[271] = args.ports[271],
+        .ports[272] = args.ports[272],
+        .ports[273] = args.ports[273],
+        .ports[274] = args.ports[274],
+        .ports[275] = args.ports[275],
+        .ports[276] = args.ports[276],
+        .ports[277] = args.ports[277],
+        .ports[278] = args.ports[278],
+        .ports[279] = args.ports[279],
+        .ports[280] = args.ports[280],
+        .ports[281] = args.ports[281],
+        .ports[282] = args.ports[282],
+        .ports[283] = args.ports[283],
+        .ports[284] = args.ports[284],
+        .ports[285] = args.ports[285],
+        .ports[286] = args.ports[286],
+        .ports[287] = args.ports[287],
+        .ports[288] = args.ports[288],
+        .ports[289] = args.ports[289],
+        .ports[290] = args.ports[290],
+        .ports[291] = args.ports[291],
+        .ports[292] = args.ports[292],
+        .ports[293] = args.ports[293],
+        .ports[294] = args.ports[294],
+        .ports[295] = args.ports[295],
+        .ports[296] = args.ports[296],
+        .ports[297] = args.ports[297],
+        .ports[298] = args.ports[298],
+        .ports[299] = args.ports[299],
+        .ports[300] = args.ports[300],
+        .ports[301] = args.ports[301],
+        .ports[302] = args.ports[302],
+        .ports[303] = args.ports[303],
+        .ports[304] = args.ports[304],
+        .ports[305] = args.ports[305],
+        .ports[306] = args.ports[306],
+        .ports[307] = args.ports[307],
+        .ports[308] = args.ports[308],
+        .ports[309] = args.ports[309],
+        .ports[310] = args.ports[310],
+        .ports[311] = args.ports[311],
+        .ports[312] = args.ports[312],
+        .ports[313] = args.ports[313],
+        .ports[314] = args.ports[314],
+        .ports[315] = args.ports[315],
+        .ports[316] = args.ports[316],
+        .ports[317] = args.ports[317],
+        .ports[318] = args.ports[318],
+        .ports[319] = args.ports[319],
+        .ports[320] = args.ports[320],
+        .ports[321] = args.ports[321],
+        .ports[322] = args.ports[322],
+        .ports[323] = args.ports[323],
+        .ports[324] = args.ports[324],
+        .ports[325] = args.ports[325],
+        .ports[326] = args.ports[326],
+        .ports[327] = args.ports[327],
+        .ports[328] = args.ports[328],
+        .ports[329] = args.ports[329],
+        .ports[330] = args.ports[330],
+        .ports[331] = args.ports[331],
+        .ports[332] = args.ports[332],
+        .ports[333] = args.ports[333],
+        .ports[334] = args.ports[334],
+        .ports[335] = args.ports[335],
+        .ports[336] = args.ports[336],
+        .ports[337] = args.ports[337],
+        .ports[338] = args.ports[338],
+        .ports[339] = args.ports[339],
+        .ports[340] = args.ports[340],
+        .ports[341] = args.ports[341],
+        .ports[342] = args.ports[342],
+        .ports[343] = args.ports[343],
+        .ports[344] = args.ports[344],
+        .ports[345] = args.ports[345],
+        .ports[346] = args.ports[346],
+        .ports[347] = args.ports[347],
+        .ports[348] = args.ports[348],
+        .ports[349] = args.ports[349],
+        .ports[350] = args.ports[350],
+        .ports[351] = args.ports[351],
+        .ports[352] = args.ports[352],
+        .ports[353] = args.ports[353],
+        .ports[354] = args.ports[354],
+        .ports[355] = args.ports[355],
+        .ports[356] = args.ports[356],
+        .ports[357] = args.ports[357],
+        .ports[358] = args.ports[358],
+        .ports[359] = args.ports[359],
+        .ports[360] = args.ports[360],
+        .ports[361] = args.ports[361],
+        .ports[362] = args.ports[362],
+        .ports[363] = args.ports[363],
+        .ports[364] = args.ports[364],
+        .ports[365] = args.ports[365],
+        .ports[366] = args.ports[366],
+        .ports[367] = args.ports[367],
+        .ports[368] = args.ports[368],
+        .ports[369] = args.ports[369],
+        .ports[370] = args.ports[370],
+        .ports[371] = args.ports[371],
+        .ports[372] = args.ports[372],
+        .ports[373] = args.ports[373],
+        .ports[374] = args.ports[374],
+        .ports[375] = args.ports[375],
+        .ports[376] = args.ports[376],
+        .ports[377] = args.ports[377],
+        .ports[378] = args.ports[378],
+        .ports[379] = args.ports[379],
+        .ports[380] = args.ports[380],
+        .ports[381] = args.ports[381],
+        .ports[382] = args.ports[382],
+        .ports[383] = args.ports[383],
+        .ports[384] = args.ports[384],
+        .ports[385] = args.ports[385],
+        .ports[386] = args.ports[386],
+        .ports[387] = args.ports[387],
+        .ports[388] = args.ports[388],
+        .ports[389] = args.ports[389],
+        .ports[390] = args.ports[390],
+        .ports[391] = args.ports[391],
+        .ports[392] = args.ports[392],
+        .ports[393] = args.ports[393],
+        .ports[394] = args.ports[394],
+        .ports[395] = args.ports[395],
+        .ports[396] = args.ports[396],
+        .ports[397] = args.ports[397],
+        .ports[398] = args.ports[398],
+        .ports[399] = args.ports[399],
+        .ports[400] = args.ports[400],
+        .ports[401] = args.ports[401],
+        .ports[402] = args.ports[402],
+        .ports[403] = args.ports[403],
+        .ports[404] = args.ports[404],
+        .ports[405] = args.ports[405],
+        .ports[406] = args.ports[406],
+        .ports[407] = args.ports[407],
+        .ports[408] = args.ports[408],
+        .ports[409] = args.ports[409],
+        .ports[410] = args.ports[410],
+        .ports[411] = args.ports[411],
+        .ports[412] = args.ports[412],
+        .ports[413] = args.ports[413],
+        .ports[414] = args.ports[414],
+        .ports[415] = args.ports[415],
+        .ports[416] = args.ports[416],
+        .ports[417] = args.ports[417],
+        .ports[418] = args.ports[418],
+        .ports[419] = args.ports[419],
+        .ports[420] = args.ports[420],
+        .ports[421] = args.ports[421],
+        .ports[422] = args.ports[422],
+        .ports[423] = args.ports[423],
+        .ports[424] = args.ports[424],
+        .ports[425] = args.ports[425],
+        .ports[426] = args.ports[426],
+        .ports[427] = args.ports[427],
+        .ports[428] = args.ports[428],
+        .ports[429] = args.ports[429],
+        .ports[430] = args.ports[430],
+        .ports[431] = args.ports[431],
+        .ports[432] = args.ports[432],
+        .ports[433] = args.ports[433],
+        .ports[434] = args.ports[434],
+        .ports[435] = args.ports[435],
+        .ports[436] = args.ports[436],
+        .ports[437] = args.ports[437],
+        .ports[438] = args.ports[438],
+        .ports[439] = args.ports[439],
+        .ports[440] = args.ports[440],
+        .ports[441] = args.ports[441],
+        .ports[442] = args.ports[442],
+        .ports[443] = args.ports[443],
+        .ports[444] = args.ports[444],
+        .ports[445] = args.ports[445],
+        .ports[446] = args.ports[446],
+        .ports[447] = args.ports[447],
+        .ports[448] = args.ports[448],
+        .ports[449] = args.ports[449],
+        .ports[450] = args.ports[450],
+        .ports[451] = args.ports[451],
+        .ports[452] = args.ports[452],
+        .ports[453] = args.ports[453],
+        .ports[454] = args.ports[454],
+        .ports[455] = args.ports[455],
+        .ports[456] = args.ports[456],
+        .ports[457] = args.ports[457],
+        .ports[458] = args.ports[458],
+        .ports[459] = args.ports[459],
+        .ports[460] = args.ports[460],
+        .ports[461] = args.ports[461],
+        .ports[462] = args.ports[462],
+        .ports[463] = args.ports[463],
+        .ports[464] = args.ports[464],
+        .ports[465] = args.ports[465],
+        .ports[466] = args.ports[466],
+        .ports[467] = args.ports[467],
+        .ports[468] = args.ports[468],
+        .ports[469] = args.ports[469],
+        .ports[470] = args.ports[470],
+        .ports[471] = args.ports[471],
+        .ports[472] = args.ports[472],
+        .ports[473] = args.ports[473],
+        .ports[474] = args.ports[474],
+        .ports[475] = args.ports[475],
+        .ports[476] = args.ports[476],
+        .ports[477] = args.ports[477],
+        .ports[478] = args.ports[478],
+        .ports[479] = args.ports[479],
+        .ports[480] = args.ports[480],
+        .ports[481] = args.ports[481],
+        .ports[482] = args.ports[482],
+        .ports[483] = args.ports[483],
+        .ports[484] = args.ports[484],
+        .ports[485] = args.ports[485],
+        .ports[486] = args.ports[486],
+        .ports[487] = args.ports[487],
+        .ports[488] = args.ports[488],
+        .ports[489] = args.ports[489],
+        .ports[490] = args.ports[490],
+        .ports[491] = args.ports[491],
+        .ports[492] = args.ports[492],
+        .ports[493] = args.ports[493],
+        .ports[494] = args.ports[494],
+        .ports[495] = args.ports[495],
+        .ports[496] = args.ports[496],
+        .ports[497] = args.ports[497],
+        .ports[498] = args.ports[498],
+        .ports[499] = args.ports[499],
+        .ports[500] = args.ports[500],
+        .ports[501] = args.ports[501],
+        .ports[502] = args.ports[502],
+        .ports[503] = args.ports[503],
+        .ports[504] = args.ports[504],
+        .ports[505] = args.ports[505],
+        .ports[506] = args.ports[506],
+        .ports[507] = args.ports[507],
+        .ports[508] = args.ports[508],
+        .ports[509] = args.ports[509],
+        .ports[510] = args.ports[510],
+        .ports[511] = args.ports[511],
+        .ports[512] = args.ports[512],
+        .ports[513] = args.ports[513],
+        .ports[514] = args.ports[514],
+        .ports[515] = args.ports[515],
+        .ports[516] = args.ports[516],
+        .ports[517] = args.ports[517],
+        .ports[518] = args.ports[518],
+        .ports[519] = args.ports[519],
+        .ports[520] = args.ports[520],
+        .ports[521] = args.ports[521],
+        .ports[522] = args.ports[522],
+        .ports[523] = args.ports[523],
+        .ports[524] = args.ports[524],
+        .ports[525] = args.ports[525],
+        .ports[526] = args.ports[526],
+        .ports[527] = args.ports[527],
+        .ports[528] = args.ports[528],
+        .ports[529] = args.ports[529],
+        .ports[530] = args.ports[530],
+        .ports[531] = args.ports[531],
+        .ports[532] = args.ports[532],
+        .ports[533] = args.ports[533],
+        .ports[534] = args.ports[534],
+        .ports[535] = args.ports[535],
+        .ports[536] = args.ports[536],
+        .ports[537] = args.ports[537],
+        .ports[538] = args.ports[538],
+        .ports[539] = args.ports[539],
+        .ports[540] = args.ports[540],
+        .ports[541] = args.ports[541],
+        .ports[542] = args.ports[542],
+        .ports[543] = args.ports[543],
+        .ports[544] = args.ports[544],
+        .ports[545] = args.ports[545],
+        .ports[546] = args.ports[546],
+        .ports[547] = args.ports[547],
+        .ports[548] = args.ports[548],
+        .ports[549] = args.ports[549],
+        .ports[550] = args.ports[550],
+        .ports[551] = args.ports[551],
+        .ports[552] = args.ports[552],
+        .ports[553] = args.ports[553],
+        .ports[554] = args.ports[554],
+        .ports[555] = args.ports[555],
+        .ports[556] = args.ports[556],
+        .ports[557] = args.ports[557],
+        .ports[558] = args.ports[558],
+        .ports[559] = args.ports[559],
+        .ports[560] = args.ports[560],
+        .ports[561] = args.ports[561],
+        .ports[562] = args.ports[562],
+        .ports[563] = args.ports[563],
+        .ports[564] = args.ports[564],
+        .ports[565] = args.ports[565],
+        .ports[566] = args.ports[566],
+        .ports[567] = args.ports[567],
+        .ports[568] = args.ports[568],
+        .ports[569] = args.ports[569],
+        .ports[570] = args.ports[570],
+        .ports[571] = args.ports[571],
+        .ports[572] = args.ports[572],
+        .ports[573] = args.ports[573],
+        .ports[574] = args.ports[574],
+        .ports[575] = args.ports[575],
+        .ports[576] = args.ports[576],
+        .ports[577] = args.ports[577],
+        .ports[578] = args.ports[578],
+        .ports[579] = args.ports[579],
+        .ports[580] = args.ports[580],
+        .ports[581] = args.ports[581],
+        .ports[582] = args.ports[582],
+        .ports[583] = args.ports[583],
+        .ports[584] = args.ports[584],
+        .ports[585] = args.ports[585],
+        .ports[586] = args.ports[586],
+        .ports[587] = args.ports[587],
+        .ports[588] = args.ports[588],
+        .ports[589] = args.ports[589],
+        .ports[590] = args.ports[590],
+        .ports[591] = args.ports[591],
+        .ports[592] = args.ports[592],
+        .ports[593] = args.ports[593],
+        .ports[594] = args.ports[594],
+        .ports[595] = args.ports[595],
+        .ports[596] = args.ports[596],
+        .ports[597] = args.ports[597],
+        .ports[598] = args.ports[598],
+        .ports[599] = args.ports[599],
+        .ports[600] = args.ports[600],
+        .ports[601] = args.ports[601],
+        .ports[602] = args.ports[602],
+        .ports[603] = args.ports[603],
+        .ports[604] = args.ports[604],
+        .ports[605] = args.ports[605],
+        .ports[606] = args.ports[606],
+        .ports[607] = args.ports[607],
+        .ports[608] = args.ports[608],
+        .ports[609] = args.ports[609],
+        .ports[610] = args.ports[610],
+        .ports[611] = args.ports[611],
+        .ports[612] = args.ports[612],
+        .ports[613] = args.ports[613],
+        .ports[614] = args.ports[614],
+        .ports[615] = args.ports[615],
+        .ports[616] = args.ports[616],
+        .ports[617] = args.ports[617],
+        .ports[618] = args.ports[618],
+        .ports[619] = args.ports[619],
+        .ports[620] = args.ports[620],
+        .ports[621] = args.ports[621],
+        .ports[622] = args.ports[622],
+        .ports[623] = args.ports[623],
+        .ports[624] = args.ports[624],
+        .ports[625] = args.ports[625],
+        .ports[626] = args.ports[626],
+        .ports[627] = args.ports[627],
+        .ports[628] = args.ports[628],
+        .ports[629] = args.ports[629],
+        .ports[630] = args.ports[630],
+        .ports[631] = args.ports[631],
+        .ports[632] = args.ports[632],
+        .ports[633] = args.ports[633],
+        .ports[634] = args.ports[634],
+        .ports[635] = args.ports[635],
+        .ports[636] = args.ports[636],
+        .ports[637] = args.ports[637],
+        .ports[638] = args.ports[638],
+        .ports[639] = args.ports[639],
+        .ports[640] = args.ports[640],
+        .ports[641] = args.ports[641],
+        .ports[642] = args.ports[642],
+        .ports[643] = args.ports[643],
+        .ports[644] = args.ports[644],
+        .ports[645] = args.ports[645],
+        .ports[646] = args.ports[646],
+        .ports[647] = args.ports[647],
+        .ports[648] = args.ports[648],
+        .ports[649] = args.ports[649],
+        .ports[650] = args.ports[650],
+        .ports[651] = args.ports[651],
+        .ports[652] = args.ports[652],
+        .ports[653] = args.ports[653],
+        .ports[654] = args.ports[654],
+        .ports[655] = args.ports[655],
+        .ports[656] = args.ports[656],
+        .ports[657] = args.ports[657],
+        .ports[658] = args.ports[658],
+        .ports[659] = args.ports[659],
+        .ports[660] = args.ports[660],
+        .ports[661] = args.ports[661],
+        .ports[662] = args.ports[662],
+        .ports[663] = args.ports[663],
+        .ports[664] = args.ports[664],
+        .ports[665] = args.ports[665],
+        .ports[666] = args.ports[666],
+        .ports[667] = args.ports[667],
+        .ports[668] = args.ports[668],
+        .ports[669] = args.ports[669],
+        .ports[670] = args.ports[670],
+        .ports[671] = args.ports[671],
+        .ports[672] = args.ports[672],
+        .ports[673] = args.ports[673],
+        .ports[674] = args.ports[674],
+        .ports[675] = args.ports[675],
+        .ports[676] = args.ports[676],
+        .ports[677] = args.ports[677],
+        .ports[678] = args.ports[678],
+        .ports[679] = args.ports[679],
+        .ports[680] = args.ports[680],
+        .ports[681] = args.ports[681],
+        .ports[682] = args.ports[682],
+        .ports[683] = args.ports[683],
+        .ports[684] = args.ports[684],
+        .ports[685] = args.ports[685],
+        .ports[686] = args.ports[686],
+        .ports[687] = args.ports[687],
+        .ports[688] = args.ports[688],
+        .ports[689] = args.ports[689],
+        .ports[690] = args.ports[690],
+        .ports[691] = args.ports[691],
+        .ports[692] = args.ports[692],
+        .ports[693] = args.ports[693],
+        .ports[694] = args.ports[694],
+        .ports[695] = args.ports[695],
+        .ports[696] = args.ports[696],
+        .ports[697] = args.ports[697],
+        .ports[698] = args.ports[698],
+        .ports[699] = args.ports[699],
+        .ports[700] = args.ports[700],
+        .ports[701] = args.ports[701],
+        .ports[702] = args.ports[702],
+        .ports[703] = args.ports[703],
+        .ports[704] = args.ports[704],
+        .ports[705] = args.ports[705],
+        .ports[706] = args.ports[706],
+        .ports[707] = args.ports[707],
+        .ports[708] = args.ports[708],
+        .ports[709] = args.ports[709],
+        .ports[710] = args.ports[710],
+        .ports[711] = args.ports[711],
+        .ports[712] = args.ports[712],
+        .ports[713] = args.ports[713],
+        .ports[714] = args.ports[714],
+        .ports[715] = args.ports[715],
+        .ports[716] = args.ports[716],
+        .ports[717] = args.ports[717],
+        .ports[718] = args.ports[718],
+        .ports[719] = args.ports[719],
+        .ports[720] = args.ports[720],
+        .ports[721] = args.ports[721],
+        .ports[722] = args.ports[722],
+        .ports[723] = args.ports[723],
+        .ports[724] = args.ports[724],
+        .ports[725] = args.ports[725],
+        .ports[726] = args.ports[726],
+        .ports[727] = args.ports[727],
+        .ports[728] = args.ports[728],
+        .ports[729] = args.ports[729],
+        .ports[730] = args.ports[730],
+        .ports[731] = args.ports[731],
+        .ports[732] = args.ports[732],
+        .ports[733] = args.ports[733],
+        .ports[734] = args.ports[734],
+        .ports[735] = args.ports[735],
+        .ports[736] = args.ports[736],
+        .ports[737] = args.ports[737],
+        .ports[738] = args.ports[738],
+        .ports[739] = args.ports[739],
+        .ports[740] = args.ports[740],
+        .ports[741] = args.ports[741],
+        .ports[742] = args.ports[742],
+        .ports[743] = args.ports[743],
+        .ports[744] = args.ports[744],
+        .ports[745] = args.ports[745],
+        .ports[746] = args.ports[746],
+        .ports[747] = args.ports[747],
+        .ports[748] = args.ports[748],
+        .ports[749] = args.ports[749],
+        .ports[750] = args.ports[750],
+        .ports[751] = args.ports[751],
+        .ports[752] = args.ports[752],
+        .ports[753] = args.ports[753],
+        .ports[754] = args.ports[754],
+        .ports[755] = args.ports[755],
+        .ports[756] = args.ports[756],
+        .ports[757] = args.ports[757],
+        .ports[758] = args.ports[758],
+        .ports[759] = args.ports[759],
+        .ports[760] = args.ports[760],
+        .ports[761] = args.ports[761],
+        .ports[762] = args.ports[762],
+        .ports[763] = args.ports[763],
+        .ports[764] = args.ports[764],
+        .ports[765] = args.ports[765],
+        .ports[766] = args.ports[766],
+        .ports[767] = args.ports[767],
+        .ports[768] = args.ports[768],
+        .ports[769] = args.ports[769],
+        .ports[770] = args.ports[770],
+        .ports[771] = args.ports[771],
+        .ports[772] = args.ports[772],
+        .ports[773] = args.ports[773],
+        .ports[774] = args.ports[774],
+        .ports[775] = args.ports[775],
+        .ports[776] = args.ports[776],
+        .ports[777] = args.ports[777],
+        .ports[778] = args.ports[778],
+        .ports[779] = args.ports[779],
+        .ports[780] = args.ports[780],
+        .ports[781] = args.ports[781],
+        .ports[782] = args.ports[782],
+        .ports[783] = args.ports[783],
+        .ports[784] = args.ports[784],
+        .ports[785] = args.ports[785],
+        .ports[786] = args.ports[786],
+        .ports[787] = args.ports[787],
+        .ports[788] = args.ports[788],
+        .ports[789] = args.ports[789],
+        .ports[790] = args.ports[790],
+        .ports[791] = args.ports[791],
+        .ports[792] = args.ports[792],
+        .ports[793] = args.ports[793],
+        .ports[794] = args.ports[794],
+        .ports[795] = args.ports[795],
+        .ports[796] = args.ports[796],
+        .ports[797] = args.ports[797],
+        .ports[798] = args.ports[798],
+        .ports[799] = args.ports[799],
+        .ports[800] = args.ports[800],
+        .ports[801] = args.ports[801],
+        .ports[802] = args.ports[802],
+        .ports[803] = args.ports[803],
+        .ports[804] = args.ports[804],
+        .ports[805] = args.ports[805],
+        .ports[806] = args.ports[806],
+        .ports[807] = args.ports[807],
+        .ports[808] = args.ports[808],
+        .ports[809] = args.ports[809],
+        .ports[810] = args.ports[810],
+        .ports[811] = args.ports[811],
+        .ports[812] = args.ports[812],
+        .ports[813] = args.ports[813],
+        .ports[814] = args.ports[814],
+        .ports[815] = args.ports[815],
+        .ports[816] = args.ports[816],
+        .ports[817] = args.ports[817],
+        .ports[818] = args.ports[818],
+        .ports[819] = args.ports[819],
+        .ports[820] = args.ports[820],
+        .ports[821] = args.ports[821],
+        .ports[822] = args.ports[822],
+        .ports[823] = args.ports[823],
+        .ports[824] = args.ports[824],
+        .ports[825] = args.ports[825],
+        .ports[826] = args.ports[826],
+        .ports[827] = args.ports[827],
+        .ports[828] = args.ports[828],
+        .ports[829] = args.ports[829],
+        .ports[830] = args.ports[830],
+        .ports[831] = args.ports[831],
+        .ports[832] = args.ports[832],
+        .ports[833] = args.ports[833],
+        .ports[834] = args.ports[834],
+        .ports[835] = args.ports[835],
+        .ports[836] = args.ports[836],
+        .ports[837] = args.ports[837],
+        .ports[838] = args.ports[838],
+        .ports[839] = args.ports[839],
+        .ports[840] = args.ports[840],
+        .ports[841] = args.ports[841],
+        .ports[842] = args.ports[842],
+        .ports[843] = args.ports[843],
+        .ports[844] = args.ports[844],
+        .ports[845] = args.ports[845],
+        .ports[846] = args.ports[846],
+        .ports[847] = args.ports[847],
+        .ports[848] = args.ports[848],
+        .ports[849] = args.ports[849],
+        .ports[850] = args.ports[850],
+        .ports[851] = args.ports[851],
+        .ports[852] = args.ports[852],
+        .ports[853] = args.ports[853],
+        .ports[854] = args.ports[854],
+        .ports[855] = args.ports[855],
+        .ports[856] = args.ports[856],
+        .ports[857] = args.ports[857],
+        .ports[858] = args.ports[858],
+        .ports[859] = args.ports[859],
+        .ports[860] = args.ports[860],
+        .ports[861] = args.ports[861],
+        .ports[862] = args.ports[862],
+        .ports[863] = args.ports[863],
+        .ports[864] = args.ports[864],
+        .ports[865] = args.ports[865],
+        .ports[866] = args.ports[866],
+        .ports[867] = args.ports[867],
+        .ports[868] = args.ports[868],
+        .ports[869] = args.ports[869],
+        .ports[870] = args.ports[870],
+        .ports[871] = args.ports[871],
+        .ports[872] = args.ports[872],
+        .ports[873] = args.ports[873],
+        .ports[874] = args.ports[874],
+        .ports[875] = args.ports[875],
+        .ports[876] = args.ports[876],
+        .ports[877] = args.ports[877],
+        .ports[878] = args.ports[878],
+        .ports[879] = args.ports[879],
+        .ports[880] = args.ports[880],
+        .ports[881] = args.ports[881],
+        .ports[882] = args.ports[882],
+        .ports[883] = args.ports[883],
+        .ports[884] = args.ports[884],
+        .ports[885] = args.ports[885],
+        .ports[886] = args.ports[886],
+        .ports[887] = args.ports[887],
+        .ports[888] = args.ports[888],
+        .ports[889] = args.ports[889],
+        .ports[890] = args.ports[890],
+        .ports[891] = args.ports[891],
+        .ports[892] = args.ports[892],
+        .ports[893] = args.ports[893],
+        .ports[894] = args.ports[894],
+        .ports[895] = args.ports[895],
+        .ports[896] = args.ports[896],
+        .ports[897] = args.ports[897],
+        .ports[898] = args.ports[898],
+        .ports[899] = args.ports[899],
+        .ports[900] = args.ports[900],
+        .ports[901] = args.ports[901],
+        .ports[902] = args.ports[902],
+        .ports[903] = args.ports[903],
+        .ports[904] = args.ports[904],
+        .ports[905] = args.ports[905],
+        .ports[906] = args.ports[906],
+        .ports[907] = args.ports[907],
+        .ports[908] = args.ports[908],
+        .ports[909] = args.ports[909],
+        .ports[910] = args.ports[910],
+        .ports[911] = args.ports[911],
+        .ports[912] = args.ports[912],
+        .ports[913] = args.ports[913],
+        .ports[914] = args.ports[914],
+        .ports[915] = args.ports[915],
+        .ports[916] = args.ports[916],
+        .ports[917] = args.ports[917],
+        .ports[918] = args.ports[918],
+        .ports[919] = args.ports[919],
+        .ports[920] = args.ports[920],
+        .ports[921] = args.ports[921],
+        .ports[922] = args.ports[922],
+        .ports[923] = args.ports[923],
+        .ports[924] = args.ports[924],
+        .ports[925] = args.ports[925],
+        .ports[926] = args.ports[926],
+        .ports[927] = args.ports[927],
+        .ports[928] = args.ports[928],
+        .ports[929] = args.ports[929],
+        .ports[930] = args.ports[930],
+        .ports[931] = args.ports[931],
+        .ports[932] = args.ports[932],
+        .ports[933] = args.ports[933],
+        .ports[934] = args.ports[934],
+        .ports[935] = args.ports[935],
+        .ports[936] = args.ports[936],
+        .ports[937] = args.ports[937],
+        .ports[938] = args.ports[938],
+        .ports[939] = args.ports[939],
+        .ports[940] = args.ports[940],
+        .ports[941] = args.ports[941],
+        .ports[942] = args.ports[942],
+        .ports[943] = args.ports[943],
+        .ports[944] = args.ports[944],
+        .ports[945] = args.ports[945],
+        .ports[946] = args.ports[946],
+        .ports[947] = args.ports[947],
+        .ports[948] = args.ports[948],
+        .ports[949] = args.ports[949],
+        .ports[950] = args.ports[950],
+        .ports[951] = args.ports[951],
+        .ports[952] = args.ports[952],
+        .ports[953] = args.ports[953],
+        .ports[954] = args.ports[954],
+        .ports[955] = args.ports[955],
+        .ports[956] = args.ports[956],
+        .ports[957] = args.ports[957],
+        .ports[958] = args.ports[958],
+        .ports[959] = args.ports[959],
+        .ports[960] = args.ports[960],
+        .ports[961] = args.ports[961],
+        .ports[962] = args.ports[962],
+        .ports[963] = args.ports[963],
+        .ports[964] = args.ports[964],
+        .ports[965] = args.ports[965],
+        .ports[966] = args.ports[966],
+        .ports[967] = args.ports[967],
+        .ports[968] = args.ports[968],
+        .ports[969] = args.ports[969],
+        .ports[970] = args.ports[970],
+        .ports[971] = args.ports[971],
+        .ports[972] = args.ports[972],
+        .ports[973] = args.ports[973],
+        .ports[974] = args.ports[974],
+        .ports[975] = args.ports[975],
+        .ports[976] = args.ports[976],
+        .ports[977] = args.ports[977],
+        .ports[978] = args.ports[978],
+        .ports[979] = args.ports[979],
+        .ports[980] = args.ports[980],
+        .ports[981] = args.ports[981],
+        .ports[982] = args.ports[982],
+        .ports[983] = args.ports[983],
+        .ports[984] = args.ports[984],
+        .ports[985] = args.ports[985],
+        .ports[986] = args.ports[986],
+        .ports[987] = args.ports[987],
+        .ports[988] = args.ports[988],
+        .ports[989] = args.ports[989],
+        .ports[990] = args.ports[990],
+        .ports[991] = args.ports[991],
+        .ports[992] = args.ports[992],
+        .ports[993] = args.ports[993],
+        .ports[994] = args.ports[994],
+        .ports[995] = args.ports[995],
+        .ports[996] = args.ports[996],
+        .ports[997] = args.ports[997],
+        .ports[998] = args.ports[998],
+        .ports[999] = args.ports[999],
+        .ports[1000] = args.ports[1000],
+        .ports[1001] = args.ports[1001],
+        .ports[1002] = args.ports[1002],
+        .ports[1003] = args.ports[1003],
+        .ports[1004] = args.ports[1004],
+        .ports[1005] = args.ports[1005],
+        .ports[1006] = args.ports[1006],
+        .ports[1007] = args.ports[1007],
+        .ports[1008] = args.ports[1008],
+        .ports[1009] = args.ports[1009],
+        .ports[1010] = args.ports[1010],
+        .ports[1011] = args.ports[1011],
+        .ports[1012] = args.ports[1012],
+        .ports[1013] = args.ports[1013],
+        .ports[1014] = args.ports[1014],
+        .ports[1015] = args.ports[1015],
+        .ports[1016] = args.ports[1016],
+        .ports[1017] = args.ports[1017],
+        .ports[1018] = args.ports[1018],
+        .ports[1019] = args.ports[1019],
+        .ports[1020] = args.ports[1020],
+        .ports[1021] = args.ports[1021],
+        .ports[1022] = args.ports[1022],
+        .ports[1023] = args.ports[1023],
+        .scan_type = args.scan_type,
+        .number_of_threads = args.speedup,
+    };
+    if (args.ip_address != nullptr)
+    {
+        config.ip_addresses[0] = args.ip_address;
+        config.ip_addresses[1] = nullptr;
+    }
+    else if (args.file_path != nullptr)
+    {
+        filename2ip_addresses(args.file_path, config.ip_addresses);
+    }
+    else
+    {
+        print_error_and_exit("No IP address or file path provided");
+    }
+    return config;
+}
+
+static size_t count_ip_addresses(const char *const ip_addresses[IP_ADDRESSES_MAX])
+{
+    size_t count = 0;
+    for (size_t i = 0; ip_addresses[i] != NULL; ++i)
+    {
+        ++count;
+    }
+    return count;
+}
+
+static size_t count_ports(const int ports[PORTS_MAX])
+{
+    size_t count = 0;
+    for (size_t i = 0; ports[i] != PORT_UNDEFINED; ++i)
+    {
+        ++count;
+    }
+    return count;
+}
+
+static size_t count_scan_types(const scan_type_t scan_type)
+{
+    if (scan_type == SCAN_TYPE_ALL)
+    {
+        return __builtin_popcount(SCAN_TYPE_ALL);
+    }
+    return 1;
+}
+
+probe_info_t *config2probe_infos(const ft_nmap_config_t config)
+{
+    const size_t num_ip_addresses = count_ip_addresses(config.ip_addresses);
+    const size_t num_ports = count_ports(config.ports);
+    const size_t num_scan_types = count_scan_types(config.scan_type);
+
+    const size_t total_probes = num_ip_addresses * num_ports * num_scan_types;
+    probe_info_t *probe_infos = malloc((total_probes + 1) * sizeof(probe_info_t));
+
+    for (size_t ip_idx = 0; ip_idx < num_ip_addresses; ++ip_idx)
+    {
+        for (size_t port_idx = 0; port_idx < num_ports; ++port_idx)
+        {
+            for (size_t scan_type_idx = 0; scan_type_idx < num_scan_types; ++scan_type_idx)
+            {
+                const size_t probe_index =
+                    ip_idx * num_ports * num_scan_types + port_idx * num_scan_types + scan_type_idx;
+                if (num_scan_types == 1)
+                {
+                    probe_infos[probe_index] =
+                        (probe_info_t){.sockaddr =
+                                           {
+                                               .sin_family = AF_INET,
+                                               .sin_port = htons(config.ports[port_idx]),
+                                               .sin_addr = {.s_addr = inet_addr(config.ip_addresses[ip_idx])},
+                                           },
+                                       .scan_type = config.scan_type};
+                }
+                else
+                {
+                    probe_infos[probe_index] =
+                        (probe_info_t){.sockaddr =
+                                           {
+                                               .sin_family = AF_INET,
+                                               .sin_port = htons(config.ports[port_idx]),
+                                               .sin_addr = {.s_addr = inet_addr(config.ip_addresses[ip_idx])},
+                                           },
+                                       .scan_type = SCAN_TYPE_INDEX_2SCAN_TYPE(scan_type_idx)};
+                }
+            }
+        }
+    }
+    probe_infos[total_probes] =
+        (probe_info_t){.sockaddr = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {.s_addr = 0}}, .scan_type = 0};
+    return probe_infos;
+}
+
+size_t count_probe_infos(const probe_info_t *const probe_infos)
+{
+    size_t count = 0;
+    for (size_t i = 0; probe_infos[i].scan_type != 0; ++i)
+    {
+        ++count;
+    }
+    return count;
 }

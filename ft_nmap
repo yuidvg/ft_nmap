@@ -1,3 +1,13 @@
-#!/usr/bin/env -S nix shell nixpkgs#bash --command bash
-# Run the program with the memory management hook
-./build/bin/ft_nmap "$@"
+#!/usr/bin/env bash
+set -euo pipefail
+
+bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/build/bin" && pwd)"
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    export DYLD_INSERT_LIBRARIES="$bin_dir/libhook.dylib"
+    export DYLD_FORCE_FLAT_NAMESPACE=1
+else
+    export LD_PRELOAD="$bin_dir/libhook.so"
+fi
+
+"$bin_dir/ft_nmap" "$@"

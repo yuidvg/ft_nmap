@@ -10,18 +10,26 @@ CFLAGS_LIBRARIES = $(shell pkg-config --cflags libpcap)
 CFLAGS_RELEASE   = -std=c23 -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES) -fblocks -isystem $(shell $(CC) -print-file-name=include) # Make cc include explicit
 CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
 LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap) -lc
-LDFLAGS_RELEASE   = $(LDFLAGS_WRAP) $(LDFLAGS_LIBRARIES)
+LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
 LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g -fsanitize=address
 
-# hook malloc (only for linux)
-ifeq ($(shell uname -s),Linux)
+# Hook malloc
 HOOK_DIR = hook
 HOOK_SRC = $(wildcard $(HOOK_DIR)/*.c)
-
 HOOK_OBJ_DIR = $(OBJ_DIR)/hook
 HOOK_OBJ = $(patsubst $(HOOK_DIR)/%.c,$(HOOK_OBJ_DIR)/%.o,$(HOOK_SRC))
-LDFLAGS_WRAP = -Wl,--wrap=malloc,--wrap=free,--wrap=calloc,--wrap=realloc
+
+# Hook shared library
+ifeq ($(shell uname -s),Darwin)
+HOOK_LIB = $(BIN_DIR)/libhook.dylib
+HOOK_LDFLAGS = -dynamiclib -fPIC \
+               -current_version 1.0 -compatibility_version 1.0 \
+               -undefined dynamic_lookup
+else
+HOOK_LIB = $(BIN_DIR)/libhook.so
+HOOK_LDFLAGS = -shared -fPIC
 endif
+
 
 MAKE = make
 
@@ -64,15 +72,18 @@ APP_SRC = $(wildcard $(APP_DIR)/*.c)
 
 # All
 ALL_INCLUDE = $(APP_INCLUDE)
-ALL_BIN = $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN) $(HOOK_BIN)
+ALL_BIN = $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN) $(HOOK_LIB)
 ALL_OBJ = $(APP_OBJ) $(DEBUG_OBJ) $(TEST_OBJ) $(HOOK_OBJ)
 
 #-----------------------------------------------------------------------------------------------------------#
-# Rules
-#-----------------------------------------------------------------------------------------------------------#
-app: $(APP_BIN)
 
-# Hook
+app: $(APP_BIN) $(HOOK_LIB)
+
+
+# Hook library
+# Link
+$(HOOK_LIB): $(HOOK_OBJ)
+	$(CC) $(HOOK_LDFLAGS) -o $@ $(HOOK_OBJ)
 # Compile
 $(HOOK_OBJ): $(HOOK_OBJ_DIR)/%.o: $(HOOK_DIR)/%.c
 	$(CC) $(CFLAGS_RELEASE) -c $< -o $@
@@ -80,7 +91,7 @@ $(HOOK_OBJ): $(HOOK_OBJ_DIR)/%.o: $(HOOK_DIR)/%.c
 # App
 # Link
 $(APP_BIN): $(HOOK_OBJ) $(APP_OBJ)
-	$(CC) $(LDFLAGS_RELEASE) -o $@ $(HOOK_OBJ) $(APP_OBJ)
+	$(CC) $(LDFLAGS_RELEASE) -o $@ $(APP_OBJ)
 # Compile
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
 	$(CC) $(CFLAGS_RELEASE)  -c $< -o $@
@@ -88,7 +99,7 @@ $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
 # Debug
 # Link
 $(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(LDFLAGS_DEBUG) -o $@ $(HOOK_OBJ) $(DEBUG_OBJ)
+	$(CC) $(LDFLAGS_DEBUG) -o $@ $(DEBUG_OBJ)
 # Compile
 $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
@@ -96,7 +107,7 @@ $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
 # Tests
 # Link
 $(TEST_BIN): $(TEST_OBJ) $(TEST_DEP_OBJ)
-	$(CC) $(LDFLAGS_DEBUG) -o $@ $(HOOK_OBJ) $(TEST_OBJ) $(TEST_DEP_OBJ)
+	$(CC) $(LDFLAGS_DEBUG) -o $@ $(TEST_OBJ) $(TEST_DEP_OBJ)
 # Compile
 $(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
