@@ -18,15 +18,15 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
                 tasks[i].status = COMPLETED;
                 return;
             }
-            printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
+            if (DEBUG) printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
             if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
-                printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
+                if (DEBUG) printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
                 tasks[i].result = OPEN;
             } else if (rtcp->th_flags & TH_RST) {
-                printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
+                if (DEBUG) printf("[-] Port %d is CLOSED (RST)\n", ntohs(rtcp->th_sport));
                 tasks[i].result = CLOSED;
             } else {
-                printf("[?] Port %d is UNEXPECTED\n", ntohs(rtcp->th_sport));
+                if (DEBUG) printf("[?] Port %d is UNEXPECTED\n", ntohs(rtcp->th_sport));
                 tasks[i].result = UNEXPECTED;
             }
             tasks[i].status = COMPLETED;

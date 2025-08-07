@@ -30,7 +30,6 @@ t_probe *build_probes(uint16_t num_tasks) {
 }
 
 ////////// CORE //////////
-
 t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
     //create the same number of tasks as probes
     t_task *tasks = malloc(sizeof(t_task) * num_tasks);
@@ -107,10 +106,9 @@ int main(int argc, char *argv[]) {
     t_thread_args args;
     args.num_tasks = 50;    // TEMPORARY
     const t_probe *probes = build_probes(args.num_tasks);
-    printf("[*] Created %d probes\n", scan_types_len);
+    if (DEBUG) printf("[*] Created %d probes\n", args.num_tasks);
     args.tasks = build_tasks(probes, args.num_tasks);
-    printf("[*] Created %d tasks\n", args.num_tasks);
-
+    if (DEBUG) printf("[*] Created %d tasks\n", args.num_tasks);
     if (get_local_ip_and_iface(args.iface, args.local_ip) != 0) {
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
@@ -121,7 +119,7 @@ int main(int argc, char *argv[]) {
     args.handle = setup_handle(args.iface);
     setup_filter(args.handle); // Needs to be improved A LOT
 
-// SENDING THE PACKETS
+// SENDING (AND RECEIVING) THE PACKETS
 
     pthread_t *threads = malloc((num_threads) * (sizeof(pthread_t)));
     if (!threads) {
@@ -131,6 +129,7 @@ int main(int argc, char *argv[]) {
     args.task_index = 0;
     args.all_tasks_sent = false;
     args.finish_time = 0;
+    printf("[*] Starting %d threads...\n", num_threads);
     for (int i = 0; i < num_threads; ++i) {
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {
@@ -144,7 +143,6 @@ int main(int argc, char *argv[]) {
     }
 
 // RESULTS AND CLEANUP
-
     print_results(args.tasks, args.num_tasks); // Print the results of the scan
 
     pcap_close(args.handle);
@@ -154,4 +152,4 @@ int main(int argc, char *argv[]) {
 }
 
 //sudo nmap -sS -p 80 scanme.nmap.org
-//sudo ./build/bin/ft_nmap 45.33.32.156 75
+//sudo ./build/bin/ft_nmap 5

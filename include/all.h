@@ -24,6 +24,8 @@
 # include <pthread.h>
 # include <../libft/libft.h>
 
+# define DEBUG 0
+
 # define TIMEOUT 2
 
 typedef enum { false, true } bool;
@@ -108,7 +110,7 @@ t_task *build_tasks(const t_probe *probes, const uint16_t num_probes);
 void *worker(void *arg);
 
 //TEMPORARY
-t_probe *build_probes(const char *target, const t_scan_types scan_type, uint16_t base_port, uint16_t num_ports);
+t_probe *build_probes(const uint16_t num_probes);
 
 #endif
 

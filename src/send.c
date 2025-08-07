@@ -19,11 +19,6 @@ unsigned short checksum(unsigned short *ptr, int nbytes) {
 }
 
 void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i) {
-    //Printing every argument for debugging purposes
-    //printf("[DEBUG] Sending SYN packet with local_ip: %s, sock: %d, test.sin_addr: %s, test.sin_port: %d, i: %d\n",
-    //       local_ip, sock, inet_ntoa(test.sin_addr), ntohs(test.sin_port), i);
-
-
     //printf("[*] Sending SYN packets to ports %d-%d...\n", base_port, base_port + 9);
 
     const struct in_addr target_ip = test.sin_addr; // Get the target IP from the probe
@@ -92,8 +87,8 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
         close(sock);
         exit(EXIT_FAILURE);
     }
-    printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
+    if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 100 ms
-    usleep(10000);
+    usleep(10000);//removing this line causes the program to miss some responses, fuck.
     //
 }
