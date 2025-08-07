@@ -30,7 +30,9 @@ HOOK_LIB = $(BIN_DIR)/libhook.so
 HOOK_LDFLAGS = -shared -fPIC
 endif
 
-
+CFLAGS_COMMON = -Wall -Wextra -Werror -pthread $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
+CFLAGS_DEBUG = -g -O0
+CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
 
 # Build Directories
@@ -113,15 +115,11 @@ $(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
 
 
-all:  $(ALL_BIN)
-
-
 debug: $(DEBUG_BIN)
 
 test: $(TEST_BIN)
 
-run-app: $(APP_BIN)
-	./$(APP_BIN)
+all: $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
 
 run-test: $(TEST_BIN)
 	./$(TEST_BIN)
@@ -130,7 +128,8 @@ debug-test: $(TEST_BIN)
 	gdb $(TEST_BIN)
 
 clean:
-	rm -rf $(ALL_BIN) $(ALL_OBJ)
+	rm -rf $(DEBUG_BIN) $(DEBUG_OBJ) $(TEST_BIN) $(TEST_OBJ) $(APP_BIN) $(APP_OBJ)
+	$(MAKE) -C $(LIBFT_DIR) fclean
 
 re: clean
 	$(MAKE) all
@@ -138,8 +137,6 @@ re: clean
 vm-up:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
 		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
-	elif grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then \
-		nix --extra-experimental-features 'nix-command flakes' run --impure .#vm; \
 	else \
 		nix run --impure .#vm; \
 	fi
@@ -148,7 +145,6 @@ vm-clean:
 	rm -rf ./nixos.qcow2 ./result
 
 vm-restart: vm-clean vm-up
-
-.PHONY: all app debug test clean re run-test vm-up vm-clean vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
+.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
 
 #-----------------------------------------------------------------------------------------------------------#

@@ -29,7 +29,6 @@ build/
 result
 *.nfs*
 thread_test
-pcap_test
 .direnv
 simple_test
 .cache
