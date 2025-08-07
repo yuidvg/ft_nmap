@@ -3,17 +3,14 @@ HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
 CC = gcc
-# Pkg-config gives us the proper include/lib flags for libpcap –
-# `pthread` has no .pc file on most Linux systems, so we use the
-# compiler-provided `-pthread` switch instead.
-CFLAGS_LIBRARIES = $(shell pkg-config --cflags libpcap)
-CFLAGS_RELEASE   = -Wall -Wextra -Werror -I$(ALL_INCLUDE) $(CFLAGS_LIBRARIES)
-CFLAGS_DEBUG     = $(CFLAGS_RELEASE) -g -O0 -fsanitize=address
 
-LDFLAGS_LIBRARIES = -pthread $(shell pkg-config --libs libpcap)
-LDFLAGS_RELEASE   = $(LDFLAGS_LIBRARIES)
-LDFLAGS_DEBUG     = $(LDFLAGS_RELEASE) -g
+PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
+PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
+PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
 
+CFLAGS_COMMON = -Wall -Wextra -Werror -pthread $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
+CFLAGS_DEBUG = -g -O0
+CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
 
 # Build Directories
@@ -49,51 +46,24 @@ APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
 APP_DIR = src
 APP_SRC = $(wildcard $(APP_DIR)/*.c)
 
-# All
-ALL_INCLUDE = $(APP_INCLUDE)
-ALL_BIN = $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
-ALL_OBJ = $(APP_OBJ) $(DEBUG_OBJ) $(TEST_OBJ)
+# Libft
+LIBFT_DIR = libft
+LIBFT_BIN = $(LIBFT_DIR)/libft.a
+LIBFT_INCLUDE = $(LIBFT_DIR)/include
+LIBFT_SRC = $(wildcard $(LIBFT_DIR)/*.c)
+
 
 #-----------------------------------------------------------------------------------------------------------#
 # Rules
 #-----------------------------------------------------------------------------------------------------------#
+
 app: $(APP_BIN)
-
-
-# App
-# Link
-$(APP_BIN): $(APP_OBJ)
-	$(CC) $(LDFLAGS_RELEASE) -o $@ $(APP_OBJ)
-# Compile
-$(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
-	$(CC) $(CFLAGS_RELEASE)  -c $< -o $@
-
-# Debug
-# Link
-$(DEBUG_BIN): $(DEBUG_OBJ)
-	$(CC) $(LDFLAGS_DEBUG) -o $@ $(DEBUG_OBJ)
-# Compile
-$(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
-	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
-
-# Tests
-# Link
-$(TEST_BIN): $(TEST_OBJ)
-	$(CC) $(LDFLAGS_DEBUG) -o $@ $(TEST_OBJ)
-# Compile
-$(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
-	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
-
-
-all:  $(ALL_BIN)
-
 
 debug: $(DEBUG_BIN)
 
 test: $(TEST_BIN)
 
-run-app: $(APP_BIN)
-	./$(APP_BIN)
+all: $(APP_BIN) $(DEBUG_BIN) $(TEST_BIN)
 
 run-test: $(TEST_BIN)
 	./$(TEST_BIN)
@@ -102,25 +72,51 @@ debug-test: $(TEST_BIN)
 	gdb $(TEST_BIN)
 
 clean:
-	rm -rf $(ALL_BIN) $(ALL_OBJ)
+	rm -rf $(DEBUG_BIN) $(DEBUG_OBJ) $(TEST_BIN) $(TEST_OBJ) $(APP_BIN) $(APP_OBJ)
+	$(MAKE) -C $(LIBFT_DIR) fclean
 
 re: clean
 	$(MAKE) all
 
 vm-up:
-	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
-		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
-	elif grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then \
-		nix --extra-experimental-features 'nix-command flakes' run --impure .#vm; \
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		nix run github:YorikSar/nixos-vm-on-macos; \
 	else \
-		nix run --impure .#vm; \
+		./.vm/cluster2nix.sh --cmd "nix run .vm#vm"; \
 	fi
 
-vm-clean:
-	rm -rf ./nixos.qcow2 ./result
+vm-down:
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		echo "VM cleanup not needed on macOS"; \
+	else \
+		./.vm/cluster2nix.sh --cleanup; \
+	fi
 
-vm-restart: vm-clean vm-up
 
-.PHONY: all app debug test clean re run-test vm-up vm-clean vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
+vm-restart: vm-down vm-up
+
+.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
+
+# Debug
+$(DEBUG_BIN): $(DEBUG_OBJ)
+	$(CC) $(CFLAGS) -o $@ $(DEBUG_OBJ) -L$(LIBFT_DIR) -lft -lpcap
+$(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
+	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
+
+# Tests
+$(TEST_BIN): $(TEST_OBJ)
+	$(CC) $(CFLAGS) -o $@ $(TEST_OBJ) -L$(LIBFT_DIR) -lft -lpcap
+$(TEST_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_DIR)/%.c
+	$(CC) $(CFLAGS) -c -I$(APP_INCLUDE) $< -o $@
+
+# App
+$(APP_BIN): $(LIBFT_BIN) $(APP_OBJ)
+	$(CC) $(CFLAGS) -o $@ $(APP_OBJ) -L$(LIBFT_DIR) -lft -lpcap
+$(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
+	$(CC) $(CFLAGS) -I$(APP_INCLUDE) -I$(LIBFT_INCLUDE) -c $< -o $@
+
+# Libft
+$(LIBFT_BIN):
+	$(MAKE) -C $(LIBFT_DIR)
 
 #-----------------------------------------------------------------------------------------------------------#
