@@ -43,8 +43,6 @@ bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks) {
     if (ret == 1) {
         handle_packet(tasks, packet, num_tasks);
         return true;
-    } else if (ret == 0) {
-        return false;
     } else {
         return false;
     }

@@ -88,7 +88,6 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
         exit(EXIT_FAILURE);
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
-    //sleep 100 ms
-    usleep(10000);//removing this line causes the program to miss some responses, fuck.
-    //
+    //sleep 1 ms 
+    usleep(100);//removing this line causes the program to miss some responses when there are threads
 }

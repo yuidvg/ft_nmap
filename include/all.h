@@ -1,5 +1,4 @@
-#ifndef FT_NMAP_H
-# define FT_NMAP_H
+#pragma once
 
 // Standard libc
 # include <stdio.h>
@@ -26,7 +25,9 @@
 
 # define DEBUG 0
 
-# define TIMEOUT 2
+# ifndef TIMEOUT
+#  define TIMEOUT 2
+# endif
 
 typedef enum { false, true } bool;
 
@@ -111,8 +112,6 @@ void *worker(void *arg);
 
 //TEMPORARY
 t_probe *build_probes(const uint16_t num_probes);
-
-#endif
 
 /*
 ////TODO
