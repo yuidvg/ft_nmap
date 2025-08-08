@@ -1,7 +1,4 @@
 #include "internal.h"
-#include "macro.h"
-#include "type.h"
-#include <stdlib.h>
 
 static bool is_number(const char *const s)
 {
@@ -2349,7 +2346,7 @@ static size_t count_ports(const int ports[PORTS_MAX])
     return count;
 }
 
-static size_t counscan_type_t(const scan_type_t scan_type)
+static size_t count_scan_types(const scan_type_t scan_type)
 {
     if (scan_type == SCAN_TYPE_ALL)
     {
@@ -2358,14 +2355,41 @@ static size_t counscan_type_t(const scan_type_t scan_type)
     return 1;
 }
 
-probe_t *config2probe_infos(const ft_nmap_config_t config)
+static struct sockaddr_in ip_address_and_port2sockaddr(const char *const ip_address, const int port)
+{
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    /* Try to parse dotted‐decimal IPv4 first */
+    if (inet_pton(AF_INET, ip_address, &addr.sin_addr) == 1)
+    {
+        return addr;
+    }
+    else
+    {
+        /* Fallback to DNS resolution */
+        struct addrinfo hints = {0}, *res = NULL;
+        hints.ai_family = AF_INET;
+        if (getaddrinfo(ip_address, NULL, &hints, &res) != 0 || res == NULL)
+        {
+            print_error_and_exit("Failed to resolve hostname");
+        }
+        addr.sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
+        freeaddrinfo(res);
+        return addr;
+    }
+}
+
+probe_t *config2probes(const ft_nmap_config_t config)
 {
     const size_t num_ip_addresses = count_ip_addresses(config.ip_addresses);
     const size_t num_ports = count_ports(config.ports);
-    const size_t num_scan_types = counscan_type_t(config.scan_type);
+    const size_t num_scan_types = count_scan_types(config.scan_type);
 
     const size_t total_probes = num_ip_addresses * num_ports * num_scan_types;
-    probe_t *probe_infos = malloc((total_probes + 1) * sizeof(probe_t));
+    probe_t *probes = malloc((total_probes + 1) * sizeof(probe_t));
 
     for (size_t ip_idx = 0; ip_idx < num_ip_addresses; ++ip_idx)
     {
@@ -2375,40 +2399,23 @@ probe_t *config2probe_infos(const ft_nmap_config_t config)
             {
                 const size_t probe_index =
                     ip_idx * num_ports * num_scan_types + port_idx * num_scan_types + scan_type_idx;
-                if (num_scan_types == 1)
-                {
-                    probe_infos[probe_index] =
-                        (probe_t){.address =
-                                      {
-                                          .sin_family = AF_INET,
-                                          .sin_port = htons(config.ports[port_idx]),
-                                          .sin_addr = {.s_addr = inet_addr(config.ip_addresses[ip_idx])},
-                                      },
-                                  .scan_type = config.scan_type};
-                }
-                else
-                {
-                    probe_infos[probe_index] =
-                        (probe_t){.address =
-                                      {
-                                          .sin_family = AF_INET,
-                                          .sin_port = htons(config.ports[port_idx]),
-                                          .sin_addr = {.s_addr = inet_addr(config.ip_addresses[ip_idx])},
-                                      },
-                                  .scan_type = SCAN_TYPE_INDEX_2SCAN_TYPE(scan_type_idx)};
-                }
+                const struct sockaddr_in destination =
+                    ip_address_and_port2sockaddr(config.ip_addresses[ip_idx], config.ports[port_idx]);
+                probes[probe_index] = (probe_t){
+                    .address = destination,
+                    .scan_type = num_scan_types == 1 ? config.scan_type : SCAN_TYPE_INDEX_2SCAN_TYPE(scan_type_idx)};
             }
         }
     }
-    probe_infos[total_probes] =
+    probes[total_probes] =
         (probe_t){.address = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {.s_addr = 0}}, .scan_type = 0};
-    return probe_infos;
+    return probes;
 }
 
-size_t count_probes(const probe_t *const probe_infos)
+size_t count_probes(const probe_t *const probes)
 {
     size_t count = 0;
-    for (size_t i = 0; probe_infos[i].scan_type != 0; ++i)
+    for (size_t i = 0; probes[i].scan_type != 0; ++i)
     {
         ++count;
     }

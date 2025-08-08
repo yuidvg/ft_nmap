@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
         }
     }
     ft_nmap_config_t config = args2config(command_line_args);
-    const probe_t *const probes = config2probe_infos(config);
+    const probe_t *const probes = config2probes(config);
 
     /* Print probe_infos for debugging/verification */
     printf("\nProbe infos:\n");
