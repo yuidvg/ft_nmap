@@ -98,8 +98,6 @@
             users.users.root = {
               password = "a";
             };
-            # Set zsh as the login shell for all users
-            # users.defaultUserShell = "/run/current-system/sw/bin/zsh";
 
             #System Wide Services
             environment = {
@@ -132,46 +130,6 @@
               enable = true;
               nix-direnv.enable = true;
             };
-
-            programs.zsh =
-              let
-                gitPromptScript = ./script/git-prompt.sh;
-              in
-              {
-                enable = true;
-                enableCompletion = true;
-                # enableAutosuggestions = true;
-                # syntaxHighlighting.enable = true;
-                # setOptions = [ "AUTO_CD" ];
-                shellAliases = {
-                  ll = "ls -l";
-                  la = "ls -la";
-                  lt = "tree";
-                  remake = "make -j clean && make -j";
-                };
-                interactiveShellInit =
-                  let
-                    initExtraBeforeCompInit = lib.mkOrder 550 ''
-                      # Add completion to fpath
-                      fpath=(/Users/yui/.docker/completions $fpath)
-                    '';
-
-                    initExtra = lib.mkOrder 1000 ''
-                      # Source git prompt script
-                      source ${gitPromptScript}
-                      GIT_PS1_SHOWUPSTREAM="verbose"
-                      precmd () { __git_ps1 "%F{cyan}%~%f%F{blue}" "%s %f" }
-
-                      # ssh agent
-                      ssh-add >/dev/null 2>/dev/null
-                      ssh-add --apple-use-keychain ~/.ssh/github >/dev/null 2>/dev/null
-                    '';
-                  in
-                  lib.mkMerge [
-                    initExtraBeforeCompInit
-                    initExtra
-                  ];
-              };
 
             # Enable OpenSSH server so the host can connect into the VM
             services.openssh = {
