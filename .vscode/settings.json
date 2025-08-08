@@ -13,5 +13,11 @@
         "cstddef": "c",
         "memory_resource": "c",
         "random": "c"
-    }
+    },
+    
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}",
+        "--query-driver=/nix/store/*/bin/clang*"
+    ]
 }
