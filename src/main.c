@@ -33,7 +33,8 @@ int main(int argc, char *argv[])
     for (size_t i = 0; probes[i].scan_type != 0; ++i)
     {
         const probe_t probe = probes[i];
-        const char *const ip_str = inet_ntoa(probe.address.sin_addr);
+        const char *const ip_str =  inet_ntoa(probe.address.sin_addr);
+
         const int port = ntohs(probe.address.sin_port);
 
         printf("  [%zu]: %s:%d (scan_type: %s)\n", i, ip_str, port, scan_type2str(probe.scan_type));

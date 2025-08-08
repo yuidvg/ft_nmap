@@ -84,7 +84,7 @@ static void parse_ports(const char *const port_str, int ports_out[PORTS_MAX])
 /* Helper function to parse scan type from string */
 static scan_type_t str2scantype(const char *const scan_str)
 {
-    if (scan_str != NULL)
+    if (scan_str != nullptr)
     {
         if (strcmp(scan_str, "SYN") == 0)
         {
@@ -123,7 +123,7 @@ static scan_type_t str2scantype(const char *const scan_str)
    On any error, prints a message to stderr and exits with failure status. */
 ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
 {
-    char *file_path = NULL;
+    char *file_path = nullptr;
     scan_type_t scan_type = SCAN_TYPE_ALL;
     int speedup = 0;
     int ports[PORTS_MAX];
@@ -134,12 +134,12 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
     }
     const char *ip_address;
 
-    static const struct option long_options[] = {{"help", no_argument, NULL, 'h'},
-                                                 {"ports", required_argument, NULL, 'p'},
-                                                 {"ip", required_argument, NULL, 'i'},
-                                                 {"file", required_argument, NULL, 'f'},
-                                                 {"speedup", required_argument, NULL, 's'},
-                                                 {"scan", required_argument, NULL, 'S'},
+    static const struct option long_options[] = {{"help", no_argument, nullptr, 'h'},
+                                                 {"ports", required_argument, nullptr, 'p'},
+                                                 {"ip", required_argument, nullptr, 'i'},
+                                                 {"file", required_argument, nullptr, 'f'},
+                                                 {"speedup", required_argument, nullptr, 's'},
+                                                 {"scan", required_argument, nullptr, 'S'},
                                                  {0, 0, 0, 0}};
     int option_index = 0;
     int c;
@@ -161,7 +161,7 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
             break;
 
         case 'f':
-            if (file_path != NULL)
+            if (file_path != nullptr)
             {
                 print_error_and_exit("Multiple --file arguments provided");
             }
@@ -1255,10 +1255,15 @@ static void filename2ip_addresses(const char *const filename, const char *ip_add
     FILE *file = fopen(filename, "r");
     if (file != nullptr)
     {
+        /* Ensure the array is clean and always nullptr-terminated */
+        for (size_t i = 0; i < IP_ADDRESSES_MAX; ++i)
+        {
+            ip_addresses[i] = nullptr;
+        }
         char line[IP_ADDRESSES_MAX];
         int index = 0;
 
-        while (fgets(line, sizeof(line), file) != NULL && index < IP_ADDRESSES_MAX)
+        while (fgets(line, sizeof(line), file) != nullptr && index < (IP_ADDRESSES_MAX - 1))
         {
             const size_t len = strlen(line);
             if (len > 0 && line[len - 1] == '\n')
@@ -1272,6 +1277,8 @@ static void filename2ip_addresses(const char *const filename, const char *ip_add
                 index++;
             }
         }
+        /* Explicitly terminate the list */
+        ip_addresses[index] = nullptr;
         fclose(file);
     }
     else
@@ -2329,7 +2336,7 @@ ft_nmap_config_t args2config(const ft_nmap_args_t args)
 static size_t count_ip_addresses(const char *const ip_addresses[IP_ADDRESSES_MAX])
 {
     size_t count = 0;
-    for (size_t i = 0; ip_addresses[i] != NULL; ++i)
+    for (size_t i = 0; ip_addresses[i] != nullptr; ++i)
     {
         ++count;
     }
@@ -2339,7 +2346,7 @@ static size_t count_ip_addresses(const char *const ip_addresses[IP_ADDRESSES_MAX
 static size_t count_ports(const int ports[PORTS_MAX])
 {
     size_t count = 0;
-    for (size_t i = 0; ports[i] != PORT_UNDEFINED; ++i)
+    for (size_t i = 0; i < PORTS_MAX && ports[i] != PORT_UNDEFINED; ++i)
     {
         ++count;
     }
@@ -2370,10 +2377,10 @@ static struct sockaddr_in ip_address_and_port2sockaddr(const char *const ip_addr
     else
     {
         /* Fallback to DNS resolution */
-        struct addrinfo hints = {0}, *res = NULL;
-        hints.ai_family = AF_INET;
-        if (getaddrinfo(ip_address, NULL, &hints, &res) != 0 || res == NULL)
+        struct addrinfo hints = {0}, *res = nullptr;
+        if (getaddrinfo(ip_address, nullptr, &hints, &res) != 0 || res == nullptr)
         {
+            freeaddrinfo(res);
             print_error_and_exit("Failed to resolve hostname");
         }
         addr.sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
