@@ -22,6 +22,7 @@ void parse_null(t_task *task, const struct tcphdr *rtcp) {
 }
 
 void parse_ack(t_task *task, const struct tcphdr *rtcp) {
+    printf("[*] Received ACK response for task %d, with flags %d\n", ntohl(rtcp->th_ack) - 1, rtcp->th_flags);
     if (rtcp->th_flags & TH_RST) {
         task->result = UNFILTERED;
     } else {
@@ -45,47 +46,64 @@ void parse_xmas(t_task *task, const struct tcphdr *rtcp) {
     }
 }
 
+int get_task_index(const t_task *tasks, const uint16_t num_tasks,
+                        const struct in_addr ip, const uint16_t port, const uint16_t host_port) {
+    printf("[*] Searching for task with ip %s, port %d, host_port %d\n", inet_ntoa(ip), port, host_port);
+    if (port == DEFAULT_PORT + XMAS)
+        printf("XXXXXXX\nXMAS port detected\nXXXXXX\n");
+    for (uint16_t i = 0; i < num_tasks; i++) {
+        if (tasks[i].status == COMPLETED) continue;
+        if (tasks[i].probe.addr.sin_addr.s_addr == ip.s_addr && ntohs(tasks[i].probe.addr.sin_port) == host_port && (int)tasks[i].scan_type == port - DEFAULT_PORT) {
+            printf("[*] Found task %d\n", i);
+            return i;
+        }
+    }
+    return -1;
+}
+
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) {
-    //printf("[*] Handling packet...\n");
     const struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
     const struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
-
+    /*
+    printf("[*] Handling packet... ip_id = %d %d\n", ntohs(rip->ip_id), ntohl(rtcp->th_ack));
+    printf("[*] Received packet with flags: %d\n", rtcp->th_flags);
+    printf("[*] Received packet from port: %d\n", ntohs(rtcp->th_sport));
+    printf("[*] Received packet from ip: %s\n", inet_ntoa(rip->ip_src));
+    */
     // The ACK field in the response should be the sequence number we sent + 1
-    const uint32_t ack = ntohl(rtcp->th_ack);
-
+    //const uint32_t ack = ntohl(rtcp->th_ack);
+    const uint16_t flags = rtcp->th_flags;
+    printf("[*] Received packet with flag: %d\n", flags);
+    const int i = get_task_index(tasks, num_tasks, rip->ip_src, ntohs(rtcp->th_dport), ntohs(rtcp->th_sport));
     // Find which task this response corresponds to
-    for (uint16_t i = 0; i < num_tasks; ++i) {
-        // We sent SYN with th_seq = htonl(i), so expect ack == i + 1
-        if (tasks[i].status != COMPLETED && ack == (uint32_t)(i + 1)) {
-            if (TIMEOUT < tasks[i].start - time(NULL)) {
-                printf("[!] Task %d timed out\n", i);
-                tasks[i].result = FILTERED;
-                tasks[i].status = COMPLETED;
-                return;
-            }
-            if (DEBUG) printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
-            switch (tasks[i].scan_type) {
-                case SYN:
-                    parse_syn(&tasks[i], rtcp);
-                    break;
-                case NUL:
-                    parse_null(&tasks[i], rtcp); // Implement this function
-                    break;
-                case ACK:
-                    parse_ack(&tasks[i], rtcp); // Implement this function
-                    break;
-                case FIN:
-                    parse_fin(&tasks[i], rtcp); // Implement this function
-                    break;
-                case XMAS:
-                    parse_xmas(&tasks[i], rtcp); // Implement this function
-                    break;
-                default:
-                    fprintf(stderr, "Unknown scan type for task %d\n", i);
-            }
+    if (tasks[i].status != COMPLETED && i != -1) {
+        if (TIMEOUT < tasks[i].start - time(NULL)) {
+            printf("[!] Task %d timed out\n", i);
+            tasks[i].result = FILTERED;
             tasks[i].status = COMPLETED;
-            break;
+            return;
         }
+        if (DEBUG) printf("[*] Received response for task %d IN HANDLE PACKET\n", i);
+        switch (tasks[i].scan_type) {
+            case SYN:
+                parse_syn(&tasks[i], rtcp);
+                break;
+            case NUL:
+                parse_null(&tasks[i], rtcp);
+                break;
+            case ACK:
+                parse_ack(&tasks[i], rtcp);
+                break;
+            case FIN:
+                parse_fin(&tasks[i], rtcp);
+                break;
+            case XMAS:
+                parse_xmas(&tasks[i], rtcp);
+                break;
+            default:
+                fprintf(stderr, "Unknown scan type for task %d\n", i);
+        }
+        tasks[i].status = COMPLETED;
     }
 }
 

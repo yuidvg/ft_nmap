@@ -48,7 +48,8 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    //const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = DEFAULT_PORT + SYN;
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
@@ -88,13 +89,14 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
         exit(EXIT_FAILURE);
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
-    //sleep 1 ms 
-    usleep(1000);//removing this line causes the program to miss some responses when there are threads
+    
+    //sleep 10 ms 
+    usleep(10000);//removing this line causes the program to miss some responses when there are threads
     //Having the delay be too short changes
 }
 
 void send_null_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i) {
-    //printf("[*] Sending SYN packets to ports %d-%d...\n", base_port, base_port + 9);
+    printf("[N] Sending NULL packets to ports...\n");
 
     const struct in_addr target_ip = test.sin_addr; // Get the target IP from the probe
     const uint16_t port = test.sin_port; // Get the port from the probe
@@ -123,7 +125,8 @@ void send_null_packet(const char *local_ip, const int sock, const struct sockadd
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    //const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = DEFAULT_PORT + NUL;
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
@@ -164,7 +167,7 @@ void send_null_packet(const char *local_ip, const int sock, const struct sockadd
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 1 ms 
-    usleep(100);//removing this line causes the program to miss some responses when there are threads
+    usleep(10000);//removing this line causes the program to miss some responses when there are threads
 }
 
 void send_ack_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i) {
@@ -197,7 +200,8 @@ void send_ack_packet(const char *local_ip, const int sock, const struct sockaddr
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    //const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = DEFAULT_PORT + ACK;
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
@@ -236,9 +240,9 @@ void send_ack_packet(const char *local_ip, const int sock, const struct sockaddr
         close(sock);
         exit(EXIT_FAILURE);
     }
-    if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
+    if (DEBUG) printf("[*] ACK packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 1 ms 
-    usleep(100);//removing this line causes the program to miss some responses when there are threads
+    usleep(10000);//removing this line causes the program to miss some responses when there are threads
 }
 
 
@@ -272,7 +276,8 @@ void send_fin_packet(const char *local_ip, const int sock, const struct sockaddr
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    //const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = DEFAULT_PORT + FIN;
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
@@ -313,13 +318,11 @@ void send_fin_packet(const char *local_ip, const int sock, const struct sockaddr
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 1 ms 
-    usleep(100);//removing this line causes the program to miss some responses when there are threads
+    usleep(10000);//removing this line causes the program to miss some responses when there are threads
 }
 
 
 void send_xmas_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i) {
-    //printf("[*] Sending SYN packets to ports %d-%d...\n", base_port, base_port + 9);
-
     const struct in_addr target_ip = test.sin_addr; // Get the target IP from the probe
     const uint16_t port = test.sin_port; // Get the port from the probe
     // Allocate only as much as needed for headers
@@ -347,14 +350,15 @@ void send_xmas_packet(const char *local_ip, const int sock, const struct sockadd
     iph->ip_dst = dest.sin_addr;                    // Destination IP
 
     // Fill TCP header - Contains the ports, flags and other relevant info
-    const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    //const uint16_t source_port = 32768 + rand() % (65535 - 32768);   // Random source port [We should ensure it's not already in use]
+    const uint16_t source_port = DEFAULT_PORT + XMAS;
     tcph->th_sport = htons(source_port);                        // Source port
     tcph->th_dport = port;                               // Destination port
     tcph->th_seq = htonl(i);                                    // Unique sequence number (used to identify the responses)
     tcph->th_ack = 0;                                           // Acknowledgment (not used in SYN scans)
     tcph->th_off = sizeof(struct tcphdr) / 4;                   // Payload offset
     tcph->th_flags = TH_FIN | TH_PUSH | TH_URG;               // Set XMAS flags (FIN, PUSH, URG)
-
+    printf("[*] Sending XMAS packet with flag %d\n", tcph->th_flags);
     tcph->th_win = htons(1024);                                 // Window size (default - not really relevent since we're not really sending data)
     tcph->th_urp = 0;                                           // Urgent pointer (rarely used - not relevant here)
 
@@ -389,8 +393,9 @@ void send_xmas_packet(const char *local_ip, const int sock, const struct sockadd
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 1 ms 
-    usleep(100);//removing this line causes the program to miss some responses when there are threads
+    usleep(10000);//removing this line causes the program to miss some responses when there are threads
 }
+
 /*
     //set XMAS flags
     tcph->th_flags = TH_FIN | TH_PUSH | TH_URG;

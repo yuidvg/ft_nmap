@@ -4,11 +4,11 @@ endif
 
 CC = gcc
 
-PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
-PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
-PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
+#PCAP_DEFAULT_PATH = /nix/store/cfzm80ii672wf9f24mvncacvjgdriz7v-libpcap-1.10.5/
+#PCAP_CFLAGS = -I$(PCAP_DEFAULT_PATH)include
+#PCAP_LDFLAGS = -L$(PCAP_DEFAULT_PATH)lib
 
-CFLAGS_COMMON = -Wall -Wextra -Werror -pthread $(PCAP_CFLAGS) $(PCAP_LDFLAGS)
+CFLAGS_COMMON = -Wall -Wextra -Werror -pthread
 CFLAGS_DEBUG = -g -O0
 CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_DEBUG)
 MAKE = make
@@ -81,6 +81,8 @@ re: clean
 vm-up:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
 		.cluster/cluster2nix.sh --cmd "nix run --impure .#vm"; \
+	elif grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then \
+		nix --extra-experimental-features 'nix-command flakes' run --impure .#vm; \
 	else \
 		nix run --impure .#vm; \
 	fi
@@ -89,6 +91,7 @@ vm-clean:
 	rm -rf ./nixos.qcow2 ./result
 
 vm-restart: vm-clean vm-up
+
 .PHONY: all app debug test clean re run-test vm-up vm-down vm-restart flake-update flake-show flake-check vm-build vm-run dev-shell
 
 # Debug

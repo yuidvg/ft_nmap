@@ -24,7 +24,7 @@
 # include <../libft/libft.h>
 
 # define DEBUG 1
-
+# define DEFAULT_PORT 61000//32800
 # ifndef TIMEOUT
 #  define TIMEOUT 2
 # endif

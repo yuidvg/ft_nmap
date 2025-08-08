@@ -29,7 +29,7 @@ t_probe *build_probes2(uint16_t num_tasks) {
     return probes;
 }
 
-t_probe *build_probes_idk(uint16_t num_tasks) {
+t_probe *build_probesALL(uint16_t num_tasks) {
     // Create an array of probes with different scan types
     t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
     if (!probes) {
@@ -51,6 +51,28 @@ t_probe *build_probes_idk(uint16_t num_tasks) {
     return probes;
 }
 
+
+t_probe *build_probes(uint16_t num_tasks) {
+    // Create an array of probes with different scan types
+    t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
+    if (!probes) {
+        perror("Failed to allocate memory for probes");
+        exit(EXIT_FAILURE);
+    }
+    //initialize the ports and ips
+    const uint16_t ports[] = {80, 81, 443, 444};
+    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
+    // Initialize the probes with different scan types
+    for (uint16_t i = 0; i < 4; i++) {
+        probes[i].scan_type = XMAS;
+        probes[i].addr.sin_family = AF_INET;
+        probes[i].addr.sin_port = htons(ports[i]);
+        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
+    }
+    return probes;
+}
+
+/*
 t_probe *build_probes(uint16_t num_tasks) {
     // Create an array of probes with different scan types
     t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
@@ -70,7 +92,7 @@ t_probe *build_probes(uint16_t num_tasks) {
     }
     return probes;
 }
-
+*/
 
 ////////// CORE //////////
 void (*choose_scan_function(t_scan_types scan_type)) {
@@ -166,7 +188,7 @@ int main(int argc, char *argv[]) {
 // SETUP
     t_thread_args args;
     //args.num_tasks = 50;    // TEMPORARY
-    args.num_tasks = 5;    // TEMPORARY
+    args.num_tasks = 20;    // TEMPORARY
     const t_probe *probes = build_probes(args.num_tasks);
     if (DEBUG) printf("[*] Created %d probes\n", args.num_tasks);
 
