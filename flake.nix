@@ -61,7 +61,8 @@
               };
               # Make VM output to the terminal instead of a separate window
               graphics = false;
-              memorySize = 4096;
+              memorySize = 8192;
+              cores = 4;
 
               # For SSH
               forwardPorts = [
@@ -81,6 +82,17 @@
             system.stateVersion = "25.05";
             boot.loader.systemd-boot.enable = true;
             boot.loader.efi.canTouchEfiVariables = true;
+            boot.kernel.sysctl = {
+              "net.core.rmem_max" = 134217728;
+              "net.core.wmem_max" = 134217728;
+              "net.core.netdev_max_backlog" = 250000;
+            };
+
+            services.journald = {
+              storage = "volatile";
+              rateLimitInterval = "30s";
+              rateLimitBurst = 1000;
+            };
 
             # Enable Nix flakes and nix-command on NixOS
             nix.settings.experimental-features = [
@@ -98,8 +110,6 @@
             users.users.root = {
               password = "a";
             };
-            # Set zsh as the login shell for all users
-            users.defaultUserShell = "/run/current-system/sw/bin/zsh";
 
             #System Wide Services
             environment = {
@@ -132,46 +142,6 @@
               enable = true;
               nix-direnv.enable = true;
             };
-
-            programs.zsh =
-              let
-                gitPromptScript = ./script/git-prompt.sh;
-              in
-              {
-                enable = true;
-                enableCompletion = true;
-                # enableAutosuggestions = true;
-                # syntaxHighlighting.enable = true;
-                # setOptions = [ "AUTO_CD" ];
-                shellAliases = {
-                  ll = "ls -l";
-                  la = "ls -la";
-                  lt = "tree";
-                  remake = "make -j clean && make -j";
-                };
-                interactiveShellInit =
-                  let
-                    initExtraBeforeCompInit = lib.mkOrder 550 ''
-                      # Add completion to fpath
-                      fpath=(/Users/yui/.docker/completions $fpath)
-                    '';
-
-                    initExtra = lib.mkOrder 1000 ''
-                      # Source git prompt script
-                      source ${gitPromptScript}
-                      GIT_PS1_SHOWUPSTREAM="verbose"
-                      precmd () { __git_ps1 "%F{cyan}%~%f%F{blue}" "%s %f" }
-
-                      # ssh agent
-                      ssh-add >/dev/null 2>/dev/null
-                      ssh-add --apple-use-keychain ~/.ssh/github >/dev/null 2>/dev/null
-                    '';
-                  in
-                  lib.mkMerge [
-                    initExtraBeforeCompInit
-                    initExtra
-                  ];
-              };
 
             # Enable OpenSSH server so the host can connect into the VM
             services.openssh = {

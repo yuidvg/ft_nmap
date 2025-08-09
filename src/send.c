@@ -31,17 +31,29 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
 
     // Prepare the destination address
     struct sockaddr_in dest;
+    memset(&dest, 0, sizeof(dest));
+#if defined(__APPLE__)
+    dest.sin_len = sizeof(struct sockaddr_in);
+#endif
     dest.sin_family = AF_INET;                      // IPv4
-    dest.sin_port = port;                    // Convert the port to the network byte order
-    dest.sin_addr = target_ip;    // Convert the target IP to binary form and assign it directly
+    dest.sin_port = port;                           // Already in network byte order
+    dest.sin_addr = target_ip;                      // Destination IP
 
     // IP header - Contains the IP addresses and other relevant info
     iph->ip_hl = sizeof(struct ip) / 4;             // Header length
     iph->ip_v = 4;                                  // IP version (IPv4)
     iph->ip_tos = 0;                                // Type of Service [is it useful to initialize it?]
+    // BSD/macOS expect ip_len and ip_off in host byte order with IP_HDRINCL,
+    // Linux expects network byte order. Handle both.
+#if defined(__APPLE__)
+    iph->ip_len = (uint16_t)(sizeof(struct ip) + sizeof(struct tcphdr));
+    iph->ip_id = htons(i);
+    iph->ip_off = 0;
+#else
     iph->ip_len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
-    iph->ip_id = htons(i);                          // Unique ID (not sent back unlike seq)
-    iph->ip_off = 0;                                // Fragment offset (no fragmentation so useless)
+    iph->ip_id = htons(i);
+    iph->ip_off = htons(0);
+#endif
     iph->ip_ttl = 64;                               // Time to Live (max number of hops - default)
     iph->ip_p = IPPROTO_TCP;                        // Protocol (TCP)
     iph->ip_src.s_addr = inet_addr(local_ip);       // Source IP
@@ -89,5 +101,5 @@ void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr
     }
     if (DEBUG) printf("[*] SYN packet sent to %s:%d\n", inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
     //sleep 1 ms
-    usleep(100);//removing this line causes the program to miss some responses when there are threads
+    usleep(100000);//removing this line causes the program to miss some responses when there are threads
 }

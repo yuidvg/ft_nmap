@@ -24,7 +24,6 @@
 *.dt
 *.tar*
 *.qcow2
-build/
 .vm/result
 result
 *.nfs*
@@ -33,3 +32,5 @@ thread_test
 simple_test
 .cache
 test_ips
+build/
+compile_commands.json

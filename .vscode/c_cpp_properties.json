@@ -2,10 +2,10 @@
     "configurations": [
         {
             "name": "ft_nmap",
-            "compilerPath": "gcc",
+            "compilerPath": "/nix/store/yr2068d9m3nsc3g5gbjgj1n3fbr9rb89-clang-wrapper-19.1.7/bin/clang",
             "includePath": [
                 "${workspaceFolder}/**"
-                        ],
+            ],
             "defines": [],
             "cStandard": "c23"
         }

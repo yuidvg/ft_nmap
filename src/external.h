@@ -1,9 +1,5 @@
 #pragma once
 
-#define _GNU_SOURCE
-
-#include <sys/types.h>
-
 // BSD-style type definitions for libpcap compatibility
 #ifndef _U_CHAR_DEFINED
 #define _U_CHAR_DEFINED
@@ -20,6 +16,19 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 #endif
 
+#if defined(__linux__)
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#endif
+#if defined(__APPLE__)
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
+#endif
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
@@ -40,5 +49,6 @@ typedef unsigned int u_int;
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>

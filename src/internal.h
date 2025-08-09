@@ -15,8 +15,8 @@ void print_help_and_exit(void);
 // args
 ft_nmap_args_t parse_arguments(const int argc, char *const argv[]);
 ft_nmap_config_t args2config(const ft_nmap_args_t args);
-probe_t *config2probe_infos(const ft_nmap_config_t config);
-size_t count_probe_infos(const probe_t *const probe_infos);
+probe_t *config2probes(const ft_nmap_config_t config);
+size_t count_probes(const probe_t *const probes);
 
 // memory
 void *safe_malloc_or_exit(const size_t size);

@@ -32,9 +32,9 @@ typedef enum
 {
     SCAN_TYPE_SYN = 1 << 0,
     SCAN_TYPE_NULL = 1 << 1,
-    SCAN_TYPE_FIN = 1 << 2,
-    SCAN_TYPE_XMAS = 1 << 3,
-    SCAN_TYPE_ACK = 1 << 4,
+    SCAN_TYPE_ACK = 1 << 2,
+    SCAN_TYPE_FIN = 1 << 3,
+    SCAN_TYPE_XMAS = 1 << 4,
     SCAN_TYPE_UDP = 1 << 5,
     SCAN_TYPE_ALL = SCAN_TYPE_SYN | SCAN_TYPE_NULL | SCAN_TYPE_FIN | SCAN_TYPE_XMAS | SCAN_TYPE_ACK | SCAN_TYPE_UDP,
 } scan_type_t;
