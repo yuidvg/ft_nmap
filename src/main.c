@@ -16,14 +16,10 @@ int main(int argc, char *argv[])
     printf("  ip_address: %s\n", command_line_args.ip_address ? command_line_args.ip_address : "(null)");
     printf("  file_path: %s\n", command_line_args.file_path ? command_line_args.file_path : "(null)");
 
-    printf("  ports:\n");
-    for (size_t i = 0; i < PORTS_MAX; ++i)
-    {
-        if (command_line_args.ports[i] != PORT_UNDEFINED)
-        {
-            printf("    [%zu]: %d\n", i, command_line_args.ports[i]);
-        }
-    }
+    // printf("  ports:\n");
+    // for (size_t i = 0; i < PORTS_MAX && command_line_args.ports[i] != PORT_UNDEFINED; ++i)
+    //     printf("    [%zu]: %d\n", i, command_line_args.ports[i]);
+
     ft_nmap_config_t config = args2config(command_line_args);
     const probe_t *const probes = config2probes(config);
 
@@ -33,7 +29,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0; probes[i].scan_type != 0; ++i)
     {
         const probe_t probe = probes[i];
-        const char *const ip_str =  inet_ntoa(probe.address.sin_addr);
+        const char *const ip_str = inet_ntoa(probe.address.sin_addr);
 
         const int port = ntohs(probe.address.sin_port);
 
