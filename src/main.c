@@ -29,7 +29,7 @@ t_probe *build_probes2(uint16_t num_tasks) {
     return probes;
 }
 
-t_probe *build_probesALL(uint16_t num_tasks) {
+t_probe *build_probes(uint16_t num_tasks) {
     // Create an array of probes with different scan types
     t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
     if (!probes) {
@@ -51,8 +51,7 @@ t_probe *build_probesALL(uint16_t num_tasks) {
     return probes;
 }
 
-
-t_probe *build_probes(uint16_t num_tasks) {
+t_probe *build_probesxmas(uint16_t num_tasks) {
     // Create an array of probes with different scan types
     t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
     if (!probes) {
@@ -95,10 +94,11 @@ t_probe *build_probes(uint16_t num_tasks) {
 */
 
 ////////// CORE //////////
+/*
 void (*choose_scan_function(t_scan_types scan_type)) {
     switch (scan_type) {
         case SYN:
-            return send_syn_packet;
+            return send_packet;
         case NUL:
             return send_null_packet;
         case ACK:
@@ -111,6 +111,7 @@ void (*choose_scan_function(t_scan_types scan_type)) {
             return NULL;
     }
 }
+*/
 
 t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
     //create the same number of tasks as probes
@@ -123,8 +124,7 @@ t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
         tasks[i].result = FILTERED;
-        tasks[i].function = choose_scan_function(probes[i].scan_type);
-        tasks[i].scan_type = probes[i].scan_type;
+        //tasks[i].scan_type = probes[i].scan_type;
     }
     return tasks;
 }
@@ -155,7 +155,7 @@ void* worker(void* arg) {
         pthread_mutex_unlock(&queue_mutex);
 
         args->tasks[my_index].start = time(NULL);
-        args->tasks[my_index].function(args->local_ip, args->sock, args->tasks[my_index].probe.addr, my_index);
+        send_packet(args->local_ip, args->sock, args->tasks[my_index].probe.addr, args->tasks[my_index].probe.scan_type);
         args->tasks[my_index].status = SENT;
     }
 
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
 
     args.sock = setup_socket();
     args.handle = setup_handle(args.iface);
-    setup_filter(args.handle); // Needs to be improved A LOT
+    setup_filter(args.handle, args.local_ip); // Needs to be improved A LOT
 
 // SENDING (AND RECEIVING) THE PACKETS
 

@@ -38,7 +38,7 @@ void print_results(const t_task *tasks, const uint16_t num_tasks) {
             default:
                 result_str = "ERROR     ";
         }
-        printf("%s | %s %s %d\n", result_str, print_scan_type(tasks[i].scan_type), inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
+        printf("%s | %s %s %d\n", result_str, print_scan_type(tasks[i].probe.scan_type), inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
         if (i % 5 == 4) { printf("\n"); } // TEMP
     }
 }
