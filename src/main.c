@@ -3,7 +3,8 @@
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 ////////// TEMPORARY //////////
-t_probe *build_probes2(uint16_t num_tasks) {
+/*
+t_probe *build_probes_old(uint16_t num_tasks) {
     // Create an array of probes with different scan types
     t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
     if (!probes) {
@@ -28,6 +29,7 @@ t_probe *build_probes2(uint16_t num_tasks) {
     }
     return probes;
 }
+*/
 
 t_probe *build_probes(uint16_t num_tasks) {
     // Create an array of probes with different scan types
@@ -71,47 +73,7 @@ t_probe *build_probesxmas(uint16_t num_tasks) {
     return probes;
 }
 
-/*
-t_probe *build_probes(uint16_t num_tasks) {
-    // Create an array of probes with different scan types
-    t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
-    if (!probes) {
-        perror("Failed to allocate memory for probes");
-        exit(EXIT_FAILURE);
-    }
-    //initialize the ports and ips
-    const uint16_t ports[] = {80, 81, 443, 444};
-    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
-    // Initialize the probes with different scan types
-    for (uint16_t j = 0; j < 5; j++) {
-        probes[j].scan_type = j;
-        probes[j].addr.sin_family = AF_INET;
-        probes[j].addr.sin_port = htons(ports[0]);
-        probes[j].addr.sin_addr.s_addr = inet_addr(ips[0]);
-    }
-    return probes;
-}
-*/
-
 ////////// CORE //////////
-/*
-void (*choose_scan_function(t_scan_types scan_type)) {
-    switch (scan_type) {
-        case SYN:
-            return send_packet;
-        case NUL:
-            return send_null_packet;
-        case ACK:
-            return send_ack_packet;
-        case FIN:
-            return send_fin_packet;
-        case XMAS:
-            return send_xmas_packet;
-        default:
-            return NULL;
-    }
-}
-*/
 
 t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
     //create the same number of tasks as probes

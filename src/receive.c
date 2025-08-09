@@ -17,12 +17,11 @@ void parse_null(t_task *task, const struct tcphdr *rtcp) {
     if (rtcp->th_flags & TH_RST) {
         task->result = CLOSED;
     } else {
-        task->result = OPEN; // CHANGE?
+        task->result = OPEN_FILTERED;
     }
 }
 
 void parse_ack(t_task *task, const struct tcphdr *rtcp) {
-    printf("[*] Received ACK response for task %d, with flags %d\n", ntohl(rtcp->th_ack) - 1, rtcp->th_flags);
     if (rtcp->th_flags & TH_RST) {
         task->result = UNFILTERED;
     } else {
@@ -34,7 +33,7 @@ void parse_fin(t_task *task, const struct tcphdr *rtcp) {
     if (rtcp->th_flags & TH_RST) {
         task->result = CLOSED;
     } else {
-        task->result = OPEN; // CHANGE?
+        task->result = OPEN_FILTERED;
     }
 }
 
@@ -42,14 +41,11 @@ void parse_xmas(t_task *task, const struct tcphdr *rtcp) {
     if (rtcp->th_flags & TH_RST) {
         task->result = CLOSED;
     } else {
-        task->result = OPEN; // CHANGE?
+        task->result = OPEN_FILTERED;
     }
 }
 
 int get_task_index(const t_task *tasks, const uint16_t num_tasks, const struct in_addr ip, const uint16_t port, const uint16_t host_port) {
-    //printf("[*] Searching for task with ip %s, port %d, host_port %d\n", inet_ntoa(ip), port, host_port);
-    if (port == DEFAULT_PORT + XMAS)
-        printf("XXXXXXX\nXMAS port detected\nXXXXXX\n");
     for (uint16_t i = 0; i < num_tasks; i++) {
         if (tasks[i].status == COMPLETED) continue;
         if (tasks[i].probe.addr.sin_addr.s_addr == ip.s_addr && ntohs(tasks[i].probe.addr.sin_port) == host_port && (int)tasks[i].probe.scan_type == port - DEFAULT_PORT) {
@@ -63,14 +59,7 @@ int get_task_index(const t_task *tasks, const uint16_t num_tasks, const struct i
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) {
     const struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
     const struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
-    /*
-    printf("[*] Handling packet... ip_id = %d %d\n", ntohs(rip->ip_id), ntohl(rtcp->th_ack));
-    printf("[*] Received packet with flags: %d\n", rtcp->th_flags);
-    printf("[*] Received packet from port: %d\n", ntohs(rtcp->th_sport));
-    printf("[*] Received packet from ip: %s\n", inet_ntoa(rip->ip_src));
-    */
-    // The ACK field in the response should be the sequence number we sent + 1
-    //const uint32_t ack = ntohl(rtcp->th_ack);
+
     printf("[*] Searching for task with ip %s, port %d, host_port %d, flag %d\n", inet_ntoa(rip->ip_src), ntohs(rtcp->th_dport), ntohs(rtcp->th_sport), rtcp->th_flags);
     const int i = get_task_index(tasks, num_tasks, rip->ip_src, ntohs(rtcp->th_dport), ntohs(rtcp->th_sport));
     // Find which task this response corresponds to

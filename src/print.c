@@ -32,6 +32,9 @@ void print_results(const t_task *tasks, const uint16_t num_tasks) {
             case FILTERED:
                 result_str = "FILTERED  ";
                 break;
+            case OPEN_FILTERED:
+                result_str = "OPEN|FILTERED";
+                break;
             case UNFILTERED:
                 result_str = "UNFILTERED";
                 break;
