@@ -39,6 +39,7 @@ typedef unsigned int u_int;
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <pcap.h>
 #include <pthread.h>
 #include <stdbool.h>
