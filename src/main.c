@@ -1,10 +1,13 @@
 #include "internal.h"
+#include "string.h"
 #include "type.h"
 
 extern pthread_mutex_t queue_mutex;
 
 int main(int argc, char *argv[])
 {
+    const char *const file_path = strdup(argv[1]);
+    (void)file_path;
     const ft_nmap_args_t command_line_args = parse_arguments(argc, argv);
 
     /* Print the parsed arguments for debugging/verification */

@@ -23,6 +23,9 @@ BUILD_DIR = build
 OBJ_DIR   = $(BUILD_DIR)/obj
 BIN_DIR   = $(BUILD_DIR)/bin
 
+# Ensure default goal builds everything, including hook library
+.DEFAULT_GOAL := all
+
 #-----------------------------------------------------------------------------------------------------------#
 # APP
 #-----------------------------------------------------------------------------------------------------------#
@@ -36,9 +39,13 @@ APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
 APP_DIR = src
 APP_SRC = $(wildcard $(APP_DIR)/*.c)
 # Rule
-app: $(APP_BIN) $(HOOK_LIB)
+ifeq ($(shell uname -s),Linux)
+app: $(HOOK_LIB) $(APP_BIN)
+else
+app: $(APP_BIN)
+endif
 # Link
-$(APP_BIN): $(HOOK_OBJ) $(APP_OBJ)
+$(APP_BIN): $(APP_OBJ)
 	$(CC) $(LDFLAGS_RELEASE) -Wl,-rpath=$(BIN_DIR) -o $@ $(APP_OBJ)
 # Compile
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
@@ -128,33 +135,39 @@ HOOK_SRC = $(wildcard $(HOOK_DIR)/*.c)
 HOOK_OBJ_DIR = $(OBJ_DIR)/hook
 HOOK_OBJ = $(patsubst $(HOOK_DIR)/%.c,$(HOOK_OBJ_DIR)/%.o,$(HOOK_SRC))
 
-# Hook shared library
-ifeq ($(shell uname -s),Darwin)
-# HOOK_LIB = $(BIN_DIR)/libhook.dylib
-# HOOK_LDFLAGS = -dynamiclib -fPIC \
-#                -current_version 1.0 -compatibility_version 1.0 \
-#                -undefined dynamic_lookup
+# OS-specific shared library settings
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+HOOK_EXT = dylib
+HOOK_LDFLAGS = -dynamiclib -fPIC -Wl,-undefined,dynamic_lookup
+HOOK_LDLIBS =
 else
-HOOK_LIB = $(BIN_DIR)/libhook.so
+HOOK_EXT = so
 HOOK_LDFLAGS = -shared -fPIC
+HOOK_LDLIBS = -ldl -pthread
 endif
-# Hook library
+HOOK_LIB = $(BIN_DIR)/libhook.$(HOOK_EXT)
+
+
+hook: $(HOOK_LIB)
 # Link
 $(HOOK_LIB): $(HOOK_OBJ)
-	$(CC) $(HOOK_LDFLAGS) -o $@ $(HOOK_OBJ)
+	$(CC) $(HOOK_LDFLAGS) -o $@ $(HOOK_OBJ) $(HOOK_LDLIBS)
 # Compile
 $(HOOK_OBJ): $(HOOK_OBJ_DIR)/%.o: $(HOOK_DIR)/%.c
-	$(CC) $(CFLAGS_RELEASE) -c $< -o $@
+	$(CC) $(CFLAGS_RELEASE) -fPIC -c $< -o $@
 
 #-----------------------------------------------------------------------------------------------------------#
 # ALL
 #-----------------------------------------------------------------------------------------------------------#
 # Config
 ALL_INCLUDE = $(APP_INCLUDE)
-ALL_BIN = $(APP_BIN) $(APP_DEBUG_BIN) $(DEBUG_BIN) $(TEST_BIN) $(HOOK_LIB)
+# Keep these for clean rules, but exclude debug from ALL_BIN to avoid failing when debug/main.c has no main
+ALL_BIN = $(APP_BIN) $(APP_DEBUG_BIN) $(TEST_BIN) $(HOOK_LIB)
 ALL_OBJ = $(APP_OBJ) $(APP_DEBUG_OBJ) $(DEBUG_OBJ) $(TEST_OBJ) $(HOOK_OBJ)
-# Rule
-all: $(ALL_BIN)
+# Rule: build core targets; keep debug and tests opt-in (run `make debug` / `make test` explicitly)
+all: app app-debug hook
+
 
 clean:
 	rm -rf $(ALL_BIN) $(ALL_OBJ)
@@ -180,6 +193,6 @@ vm-clean:
 	rm -rf ./nixos.qcow2 ./result
 
 vm-restart: vm-clean vm-up
-.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart app-debug
+.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart app-debug hook
 
 #-----------------------------------------------------------------------------------------------------------#

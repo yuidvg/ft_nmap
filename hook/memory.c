@@ -190,7 +190,7 @@ void *hook_malloc(size_t sz)
 {
     pthread_once(&g_init_once, initialize_hooks);
     void *p = safe_malloc_or_exit(sz);
-    // fprintf(stderr, "[hook] malloc(%zu) = %p\n", sz, p);
+    fprintf(stderr, "[hook] malloc(%zu) = %p\n", sz, p);
     return p;
 }
 
@@ -211,7 +211,7 @@ static void nullify_in_memory_manager(void *ptr)
 void hook_free(void *ptr)
 {
     pthread_once(&g_init_once, initialize_hooks);
-    // fprintf(stderr, "[hook] free(%p)\n", ptr);
+    fprintf(stderr, "[hook] free(%p)\n", ptr);
     atomiccally_or_exit(nullify_in_memory_manager, ptr);
     g_real_free(ptr);
 }
