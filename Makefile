@@ -39,7 +39,7 @@ APP_SRC = $(wildcard $(APP_DIR)/*.c)
 app: $(APP_BIN) $(HOOK_LIB)
 # Link
 $(APP_BIN): $(HOOK_OBJ) $(APP_OBJ)
-	$(CC) $(LDFLAGS_RELEASE) -o $@ $(APP_OBJ)
+	$(CC) $(LDFLAGS_RELEASE) -Wl,-rpath=$(BIN_DIR) -o $@ $(APP_OBJ)
 # Compile
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
 	$(CC) $(CFLAGS_RELEASE)  -c $< -o $@
