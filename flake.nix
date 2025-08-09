@@ -61,7 +61,8 @@
               };
               # Make VM output to the terminal instead of a separate window
               graphics = false;
-              memorySize = 4096;
+              memorySize = 8192;
+              cores = 4;
 
               # For SSH
               forwardPorts = [
@@ -81,6 +82,17 @@
             system.stateVersion = "25.05";
             boot.loader.systemd-boot.enable = true;
             boot.loader.efi.canTouchEfiVariables = true;
+            boot.kernel.sysctl = {
+              "net.core.rmem_max" = 134217728;
+              "net.core.wmem_max" = 134217728;
+              "net.core.netdev_max_backlog" = 250000;
+            };
+
+            services.journald = {
+              storage = "volatile";
+              rateLimitInterval = "30s";
+              rateLimitBurst = 1000;
+            };
 
             # Enable Nix flakes and nix-command on NixOS
             nix.settings.experimental-features = [
