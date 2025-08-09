@@ -2376,17 +2376,9 @@ static struct sockaddr_in ip_address_and_port2sockaddr(const char *const ip_addr
     }
     else
     {
-        /* Fallback to DNS resolution */
-        struct addrinfo hints = {.ai_family = AF_INET, .ai_flags = AI_ADDRCONFIG}, *res = nullptr;
-        if (getaddrinfo(ip_address, nullptr, &hints, &res) != 0 || res == nullptr)
-        {
-            freeaddrinfo(res);
-            print_error_and_exit("Invalid Hostname or IP Address");
-        }
-        addr.sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
-        freeaddrinfo(res);
-        return addr;
+        print_error_and_exit("Invalid Hostname or IP Address");
     }
+    return addr;
 }
 
 probe_t *config2probes(const ft_nmap_config_t config)
