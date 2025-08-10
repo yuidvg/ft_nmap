@@ -175,9 +175,14 @@ vm-up:
 	fi
 
 vm-clean:
-	pkill -f "2223" || true
-	lsof -ti:2223 | xargs -r kill -9 || true
-	rm -rf ./nixos.qcow2 ./result
+	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
+			.cluster/cluster2nix.sh --cleanup;
+	else \
+		pkill -f "2223" || true; \
+		lsof -ti:2223 | xargs -r kill -9 || true; \
+		rm -rf ./nixos.qcow2 ./result; \
+	fi
+
 
 vm-restart: vm-clean vm-up
 .PHONY: all app debug test clean re run-test vm-up vm-down vm-restart app-debug
