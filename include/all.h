@@ -26,7 +26,7 @@
 # define DEBUG 1
 # define DEFAULT_PORT 32800
 # ifndef TIMEOUT
-#  define TIMEOUT 2
+#  define TIMEOUT 3
 # endif
 
 typedef enum { false, true } bool;
@@ -99,7 +99,7 @@ bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks);
 
 //send.c
 unsigned short checksum(unsigned short *ptr, int nbytes);
-void send_packet(const char *local_ip, const int sock, const struct sockaddr_in addr, t_scan_types scan_type);
+void send_packet(const char *local_ip, const int sock, const t_probe p);
 
 //setup.c
 int get_local_ip_and_iface(char *iface, char *ip);

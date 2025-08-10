@@ -53,26 +53,6 @@ t_probe *build_probes(uint16_t num_tasks) {
     return probes;
 }
 
-t_probe *build_probesxmas(uint16_t num_tasks) {
-    // Create an array of probes with different scan types
-    t_probe *probes = malloc(sizeof(t_probe) * num_tasks);
-    if (!probes) {
-        perror("Failed to allocate memory for probes");
-        exit(EXIT_FAILURE);
-    }
-    //initialize the ports and ips
-    const uint16_t ports[] = {80, 81, 443, 444};
-    const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
-    // Initialize the probes with different scan types
-    for (uint16_t i = 0; i < 4; i++) {
-        probes[i].scan_type = XMAS;
-        probes[i].addr.sin_family = AF_INET;
-        probes[i].addr.sin_port = htons(ports[i]);
-        probes[i].addr.sin_addr.s_addr = inet_addr(ips[i]);
-    }
-    return probes;
-}
-
 ////////// CORE //////////
 
 t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
@@ -86,7 +66,6 @@ t_task *build_tasks(const t_probe *probes, const uint16_t num_tasks) {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
         tasks[i].result = FILTERED;
-        //tasks[i].scan_type = probes[i].scan_type;
     }
     return tasks;
 }
@@ -95,41 +74,27 @@ void* worker(void* arg) {
     t_thread_args *args = (t_thread_args*)arg;
     bool is_receiver = false;
 
-    while (1) {
-        if (pthread_mutex_trylock(&queue_mutex) == 0) {
+    while (args->task_index < args->num_tasks || is_receiver) {
+        if (pthread_mutex_trylock(&queue_mutex) == 0) {// Before sending a task, we check if there are any responses to handle
             bool check_message = true;
-            while (check_message) {// Before sending a task, we check if there are any responses to handle
+            while (check_message || is_receiver) {
                 check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
+                if (is_receiver && (time(NULL) - args->finish_time) > TIMEOUT)
+                    return NULL;
             }
             pthread_mutex_unlock(&queue_mutex);
         }
         pthread_mutex_lock(&queue_mutex);
-        if (args->task_index >= args->num_tasks) {// When all tasks are sent, we choose a thread to be the receiver and we lock the timer
-            if (!args->all_tasks_sent) {
-                args->all_tasks_sent = true;
-                args->finish_time = time(NULL);
-                is_receiver = true;
-            }
-            pthread_mutex_unlock(&queue_mutex);
-            break;
-        }
         const uint16_t my_index = args->task_index++;
         pthread_mutex_unlock(&queue_mutex);
-
         args->tasks[my_index].start = time(NULL);
-        send_packet(args->local_ip, args->sock, args->tasks[my_index].probe.addr, args->tasks[my_index].probe.scan_type);
+        send_packet(args->local_ip, args->sock, args->tasks[my_index].probe);
         args->tasks[my_index].status = SENT;
-    }
-
-    //Dedicated thread (the one that sent the last task) handle the responses until the timeout
-    if (is_receiver) {
-        printf("[*] All tasks sent. Waiting for responses...\n");
-        bool check_message = true;
-        while (check_message || (time(NULL) - args->finish_time) < TIMEOUT) {
-            check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
+        if (args->task_index >= args->num_tasks && !args->all_tasks_sent) {
+            args->all_tasks_sent = true;
+            args->finish_time = time(NULL);
+            is_receiver = true; // This thread will be the receiver, checking for responses until the timeout
         }
-        //for some reason if we add a sleep here we miss some responses
-        printf("[*] Receiver thread finished.\n");
     }
     return NULL;
 }
@@ -149,7 +114,6 @@ int main(int argc, char *argv[]) {
 
 // SETUP
     t_thread_args args;
-    //args.num_tasks = 50;    // TEMPORARY
     args.num_tasks = 20;    // TEMPORARY
     const t_probe *probes = build_probes(args.num_tasks);
     if (DEBUG) printf("[*] Created %d probes\n", args.num_tasks);
