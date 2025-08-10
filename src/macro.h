@@ -13,7 +13,7 @@
 #define INIT_ARRAY_ELEMENT(array, index) .array[index] = array[index]
 
 #define SCAN_TYPE_INDEX_2SCAN_TYPE(index) 1 << index
-
+#define OCTET232BITWORD(octet) (octet / 4)
 
 # define DEBUG 0
 

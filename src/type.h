@@ -71,6 +71,13 @@ typedef struct s_task
     void (*function)(const char *, int, struct sockaddr_in, uint16_t);
 } t_task;
 
+typedef struct
+{
+    struct ip ip_header;
+    struct udphdr udp_header;
+    uint8_t payload[24];
+} udp_packet_t;
+
 #ifndef IFNAMSIZ
 #define IFNAMSIZ 16
 #endif
