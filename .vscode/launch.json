@@ -7,11 +7,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/ft_nmap.out",
             "args": [
-                "-p",
-                "google.cop",
-                "-i",
-                "127.0.0.1",
-                "-f",
+                "--ip",
+                "1.1.1.1",
+                "--scan",
+                "SYN",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -38,14 +37,24 @@
             "program": "${workspaceFolder}/build/bin/ft_nmap.out",
             "args": [
                 "--ip",
-                "localhost",
+                "1.1.1.1",
+                "--scan",
+                "SYN",
             ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
-            "preLaunchTask": "make-app-debug"
+            "preLaunchTask": "make-app-debug",
+            "pipeTransport": {
+				"pipeCwd": "${workspaceFolder}",
+				"pipeProgram": "sudo",
+				"pipeArgs": [
+					"/Users/yui/.vscode/extensions/ms-vscode.cpptools-1.25.3-darwin-arm64/debugAdapters/lldb-mi/bin/lldb-mi"
+				],
+				"debuggerPath": "/Users/yui/.vscode/extensions/ms-vscode.cpptools-1.25.3-darwin-arm64/debugAdapters/lldb-mi/bin/lldb-mi"
+			}
         },
         {
             "name": "debug-test",

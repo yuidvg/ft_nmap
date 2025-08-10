@@ -75,7 +75,7 @@ typedef struct
 {
     struct ip ip_header;
     struct udphdr udp_header;
-    char payload[1024];
+    uint8_t payload[24];
 } udp_packet_t;
 
 #ifndef IFNAMSIZ

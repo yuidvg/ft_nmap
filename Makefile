@@ -36,10 +36,10 @@ APP_OBJ = $(patsubst $(APP_DIR)/%.c,$(APP_OBJ_DIR)/%.o,$(APP_SRC))
 APP_DIR = src
 APP_SRC = $(wildcard $(APP_DIR)/*.c)
 # Rule
-app: $(APP_BIN) $(HOOK_LIB)
+app: $(APP_BIN)
 # Link
-$(APP_BIN): $(HOOK_OBJ) $(APP_OBJ)
-	$(CC) $(LDFLAGS_RELEASE) -Wl,-rpath=$(BIN_DIR) -o $@ $(APP_OBJ)
+$(APP_BIN): $(APP_OBJ)
+	$(CC) $(LDFLAGS_RELEASE) -o $@ $(APP_OBJ)
 # Compile
 $(APP_OBJ): $(APP_OBJ_DIR)/%.o: $(APP_DIR)/%.c
 	$(CC) $(CFLAGS_RELEASE)  -c $< -o $@
