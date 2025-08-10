@@ -22,6 +22,94 @@ static void send_udp_datagram(const int sock, const struct sockaddr_in destinati
     (void)sendto(sock, payload, payload_len, 0, (const struct sockaddr *)&destination, sizeof(destination));
 }
 
+static size_t build_dns_query(unsigned char *const buffer, const size_t buffer_capacity,
+                              const char *const qname)
+{
+    // Minimal DNS query: ID, flags (RD), QDCOUNT=1
+    // Name is dot-encoded labels, terminated by 0x00; QTYPE=A(1), QCLASS=IN(1)
+    const size_t header_len = 12u;
+    const size_t name_len = strlen(qname);
+
+    // Compute encoded name length: sum of labels + 1 length-byte per label + trailing zero
+    size_t encoded_name_len = 1u; // at least trailing zero
+    for (size_t i = 0; i < name_len; ++i)
+    {
+        if (qname[i] == '.')
+        {
+            encoded_name_len += 1u; // length byte for next label
+        }
+        else
+        {
+            encoded_name_len += 1u; // character itself
+        }
+    }
+
+    const size_t total_len_needed = header_len + encoded_name_len + 4u; // QTYPE + QCLASS
+    if (buffer_capacity < total_len_needed)
+    {
+        return 0u;
+    }
+
+    memset(buffer, 0, total_len_needed);
+
+    // Header
+    buffer[0] = 0x12; // ID high
+    buffer[1] = 0x34; // ID low
+    buffer[2] = 0x01; // RD flag set
+    buffer[3] = 0x00;
+    buffer[4] = 0x00; // QDCOUNT high
+    buffer[5] = 0x01; // QDCOUNT low = 1
+    // ANCOUNT, NSCOUNT, ARCOUNT remain zero
+
+    // Encode QNAME
+    size_t w = header_len;
+    size_t label_start = 0u;
+    for (size_t i = 0; i <= name_len; ++i)
+    {
+        if (i == name_len || qname[i] == '.')
+        {
+            const size_t label_size = i - label_start;
+            buffer[w++] = (unsigned char)label_size;
+            for (size_t k = 0; k < label_size; ++k)
+            {
+                buffer[w++] = (unsigned char)qname[label_start + k];
+            }
+            label_start = i + 1u;
+        }
+    }
+    buffer[w++] = 0x00; // root terminator
+
+    // QTYPE = A(1)
+    buffer[w++] = 0x00;
+    buffer[w++] = 0x01;
+    // QCLASS = IN(1)
+    buffer[w++] = 0x00;
+    buffer[w++] = 0x01;
+
+    return w;
+}
+
+static size_t build_ntp_query(unsigned char *const buffer, const size_t buffer_capacity)
+{
+    const size_t ntp_len = 48u;
+    if (buffer_capacity < ntp_len)
+    {
+        return 0u;
+    }
+    memset(buffer, 0, ntp_len);
+    // LI=0, VN=3, Mode=3 (client) => 0x1b (widely accepted)
+    buffer[0] = 0x1b;
+    // Optionally set transmit timestamp to current time
+    const time_t now = time(NULL);
+    const uint32_t ntp_seconds = (uint32_t)(now + 2208988800u); // Unix -> NTP epoch
+    buffer[40] = (unsigned char)((ntp_seconds >> 24) & 0xff);
+    buffer[41] = (unsigned char)((ntp_seconds >> 16) & 0xff);
+    buffer[42] = (unsigned char)((ntp_seconds >> 8) & 0xff);
+    buffer[43] = (unsigned char)(ntp_seconds & 0xff);
+    // fractional part left as 0
+    return ntp_len;
+}
+
 static pcap_t *setup_handle(const char *iface)
 {
     char errbuf[PCAP_ERRBUF_SIZE]; // Will store pcap errors
@@ -78,6 +166,14 @@ static int ethernet_header_length(const int datalink)
     {
         len = 14;
     }
+    else if (datalink == DLT_LINUX_SLL)
+    {
+        len = 16; // Linux cooked capture v1
+    }
+    else if (datalink == DLT_LINUX_SLL2)
+    {
+        len = 20; // Linux cooked capture v2
+    }
     return len;
 }
 
@@ -115,6 +211,10 @@ static const char *udp_service_name(const int port)
     {
         name = "https";
     }
+    else if (port == 123)
+    {
+        name = "ntp";
+    }
     return name;
 }
 
@@ -128,9 +228,21 @@ static void classify_packet(const u_char *const packet,
                             t_result *const results)
 {
     const int l2 = ethernet_header_length(datalink);
+    if (l2 <= 0)
+    {
+        return;
+    }
     const unsigned char *const ip_ptr = packet + l2;
     const struct ip *const ip = (const struct ip *)ip_ptr;
+    if (ip->ip_v != 4)
+    {
+        return;
+    }
     const int ip_header_len = (int)ip->ip_hl * 4;
+    if (ip_header_len < (int)sizeof(struct ip))
+    {
+        return;
+    }
     const unsigned char *const l4_ptr = ip_ptr + ip_header_len;
 
     if (ip->ip_p == IPPROTO_UDP)
@@ -235,8 +347,9 @@ static void print_summary(const int *const ports, const size_t num_ports, const 
 int main()
 {
     const char *local_ip = "10.0.2.15";
+    const char *target_ip_str = "45.33.32.156"; // scanme.nmap.org
     const int port[30] = {
-        80,  443, 53,  161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
+        80,  443, 53,  161, 123, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
         173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187,
     };
     const int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -269,25 +382,43 @@ int main()
     for (int i = 0; i < 30; i++)
     {
         struct sockaddr_in destination = {
-            .sin_family = AF_INET, .sin_port = htons(port[i]), .sin_addr = {.s_addr = inet_addr("1.1.1.1")}};
+            .sin_family = AF_INET, .sin_port = htons(port[i]), .sin_addr = {.s_addr = inet_addr(target_ip_str)}};
         // Minimal payload; add a small payload for DNS/SNMP to avoid zero-length quirks
         const int port_host = port[i];
-        const unsigned char dns_like_payload[24] = {0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10};
+        unsigned char payload_buf[512];
         const unsigned char one_byte = 0x00;
         const unsigned char *payload = &one_byte;
         size_t payload_size = 1;
-        if (port_host == 53 || port_host == 161)
+
+        if (port_host == 53)
         {
-            payload = dns_like_payload;
-            payload_size = sizeof(dns_like_payload);
+            payload_size = build_dns_query(payload_buf, sizeof(payload_buf), "one.one.one.one");
+            if (payload_size > 0)
+            {
+                payload = payload_buf;
+            }
+        }
+        else if (port_host == 161)
+        {
+            // Simple non-empty payload for SNMP (not a valid PDU, just to avoid zero-length)
+            payload_buf[0] = 0x30; // ASN.1 SEQUENCE start
+            payload_buf[1] = 0x00; // minimal length
+            payload = payload_buf;
+            payload_size = 2;
+        }
+        else if (port_host == 123)
+        {
+            payload_size = build_ntp_query(payload_buf, sizeof(payload_buf));
+            if (payload_size > 0)
+            {
+                payload = payload_buf;
+            }
         }
         send_udp_datagram(sock, destination, payload, payload_size);
     }
     const uint16_t local_port = get_local_udp_port(sock);
     const uint32_t local_ip_be = inet_addr(local_ip);
-    const uint32_t target_ip_be = inet_addr("1.1.1.1");
+    const uint32_t target_ip_be = inet_addr(target_ip_str);
 
     const time_t start_time = time(NULL);
     while (1)
