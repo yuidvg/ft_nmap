@@ -94,6 +94,7 @@ void* worker(void* arg) {
             args->all_tasks_sent = true;
             args->finish_time = time(NULL);
             is_receiver = true; // This thread will be the receiver, checking for responses until the timeout
+            printf("[*] All tasks sent, waiting for responses...\n");
         }
     }
     return NULL;
@@ -119,7 +120,7 @@ int main(int argc, char *argv[]) {
     if (DEBUG) printf("[*] Created %d probes\n", args.num_tasks);
 
     args.tasks = build_tasks(probes, args.num_tasks);
-    if (DEBUG) printf("[*] Created %d tasks\n", args.num_tasks);
+    printf("[*] Created %d tasks\n", args.num_tasks);
     if (get_local_ip_and_iface(args.iface, args.local_ip) != 0) {
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
@@ -140,7 +141,7 @@ int main(int argc, char *argv[]) {
     args.task_index = 0;
     args.all_tasks_sent = false;
     args.finish_time = 0;
-    if (DEBUG) printf("[*] Starting %d threads...\n", num_threads);
+    printf("[*] Starting %d threads...\n", num_threads);
     for (int i = 0; i < num_threads; ++i) {
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0) {

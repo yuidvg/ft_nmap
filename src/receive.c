@@ -20,14 +20,6 @@ void parse_syn(t_task *task, const struct tcphdr *rtcp) {
     }
 }
 
-void parse_null(t_task *task, const struct tcphdr *rtcp) {
-    if (rtcp->th_flags & TH_RST) {
-        task->result = CLOSED;
-    } else {
-        task->result = OPEN_FILTERED;
-    }
-}
-
 void parse_ack(t_task *task, const struct tcphdr *rtcp) {
     if (rtcp->th_flags & TH_RST) {
         task->result = UNFILTERED;
@@ -36,15 +28,7 @@ void parse_ack(t_task *task, const struct tcphdr *rtcp) {
     }
 }
 
-void parse_fin(t_task *task, const struct tcphdr *rtcp) {
-    if (rtcp->th_flags & TH_RST) {
-        task->result = CLOSED;
-    } else {
-        task->result = OPEN_FILTERED;
-    }
-}
-
-void parse_xmas(t_task *task, const struct tcphdr *rtcp) {
+void parse_stealth(t_task *task, const struct tcphdr *rtcp) { // NUL, FIN, XMAS
     if (rtcp->th_flags & TH_RST) {
         task->result = CLOSED;
     } else {
@@ -56,7 +40,7 @@ int get_task_index(const t_task *tasks, const uint16_t num_tasks, const struct i
     for (uint16_t i = 0; i < num_tasks; i++) {
         if (tasks[i].status == COMPLETED) continue;
         if (tasks[i].probe.addr.sin_addr.s_addr == ip.s_addr && ntohs(tasks[i].probe.addr.sin_port) == host_port && (int)tasks[i].probe.scan_type == port - DEFAULT_PORT) {
-            printf("[*] Found task %d\n", i);
+            if (DEBUG) printf("[*] Found task %d\n", i);
             return i;
         }
     }
@@ -67,12 +51,12 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
     const struct ip *rip = (struct ip *)(data + 14); // skip Ethernet
     const struct tcphdr *rtcp = (struct tcphdr *)((u_char *)rip + (rip->ip_hl << 2));
 
-    printf("[*] Searching for task with ip %s, port %d, host_port %d, flag %d\n", inet_ntoa(rip->ip_src), ntohs(rtcp->th_dport), ntohs(rtcp->th_sport), rtcp->th_flags);
+    if (DEBUG) printf("[*] Searching for task with ip %s, port %d, host_port %d, flag %d\n", inet_ntoa(rip->ip_src), ntohs(rtcp->th_dport), ntohs(rtcp->th_sport), rtcp->th_flags);
     const int i = get_task_index(tasks, num_tasks, rip->ip_src, ntohs(rtcp->th_dport), ntohs(rtcp->th_sport));
     // Find which task this response corresponds to
     if (tasks[i].status != COMPLETED && i != -1) {
         if (TIMEOUT < tasks[i].start - time(NULL)) {
-            printf("[!] Task %d timed out\n", i);
+            if (DEBUG) printf("[!] Task %d timed out\n", i);
             tasks[i].result = FILTERED;
             tasks[i].status = COMPLETED;
             return;
@@ -82,23 +66,17 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
             case SYN:
                 parse_syn(&tasks[i], rtcp);
                 break;
-            case NUL:
-                parse_null(&tasks[i], rtcp);
-                break;
             case ACK:
                 parse_ack(&tasks[i], rtcp);
                 break;
-            case FIN:
-                parse_fin(&tasks[i], rtcp);
-                break;
-            case XMAS:
-                parse_xmas(&tasks[i], rtcp);
+            case NUL: case FIN: case XMAS:
+                parse_stealth(&tasks[i], rtcp);
                 break;
             default:
                 fprintf(stderr, "Unknown scan type for task %d\n", i);
         }
         tasks[i].status = COMPLETED;
-        printf("Task %d completed has service %s\n", i, service_name(ntohs(rtcp->th_sport), "tcp"));
+        if (DEBUG) printf("Task %d completed has service %s\n", i, service_name(ntohs(rtcp->th_sport), "tcp"));
     }
 }
 

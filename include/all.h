@@ -23,7 +23,7 @@
 # include <pthread.h>
 # include <../libft/libft.h>
 
-# define DEBUG 1
+# define DEBUG 0
 # define DEFAULT_PORT 32800
 # ifndef TIMEOUT
 #  define TIMEOUT 3
