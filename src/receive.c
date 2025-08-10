@@ -1,5 +1,12 @@
 # include <../include/all.h>
 
+char *service_name(const uint16_t port, const char *protocol) {
+    struct servent *se;
+    se = getservbyport(htons(port), protocol); // "tcp" or "udp"
+    return se ? se->s_name : "Unassigned";
+}
+
+
 void parse_syn(t_task *task, const struct tcphdr *rtcp) {
     if ((rtcp->th_flags & TH_SYN) && (rtcp->th_flags & TH_ACK)) {
         if (DEBUG) printf("[+] Port %d is OPEN (SYN+ACK)\n", ntohs(rtcp->th_sport));
@@ -91,6 +98,7 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
                 fprintf(stderr, "Unknown scan type for task %d\n", i);
         }
         tasks[i].status = COMPLETED;
+        printf("Task %d completed has service %s\n", i, service_name(ntohs(rtcp->th_sport), "tcp"));
     }
 }
 
