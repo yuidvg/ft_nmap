@@ -78,7 +78,7 @@ $(DEBUG_BIN): $(DEBUG_OBJ)
 	$(CC) $(LDFLAGS_ALL) -o $@ $(DEBUG_OBJ)
 # Compile
 $(DEBUG_OBJ): $(DEBUG_OBJ_DIR)/%.o: $(DEBUG_DIR)/%.c
-	$(CC) $(CFLAGS_DEBUG) -c $< -o $@
+	$(CC) $(CFLAGS_ALL) -c $< -o $@
 
 #-----------------------------------------------------------------------------------------------------------#
 # TEST
