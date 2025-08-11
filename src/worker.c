@@ -16,59 +16,37 @@ t_task *build_tasks(const probe_t *probes, const uint16_t num_tasks)
     {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
-        tasks[i].result = FILTERED;
-        tasks[i].function = send_syn_packet;
+        tasks[i].result = FILTERED;// change the default result in relation to the scan type instead of doing it in print_results
     }
     return tasks;
 }
 
-void *worker(void *arg)
-{
-    t_thread_args *args = (t_thread_args *)arg;
+void *worker(void* arg) {
+    t_thread_args *args = (t_thread_args*)arg;
     bool is_receiver = false;
 
-    while (1)
-    {
-        if (pthread_mutex_trylock(&queue_mutex) == 0)
-        {
+    while (args->task_index < args->num_tasks || is_receiver) {
+        if (pthread_mutex_trylock(&queue_mutex) == 0) {// Before sending a task, we check if there are any responses to handle
             bool check_message = true;
-            while (check_message)
-            { // Before sending a task, we check if there are any responses to handle
+            while (check_message || is_receiver) {
                 check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
+                if (is_receiver && (time(NULL) - args->finish_time) > TIMEOUT)
+                    return NULL;
             }
             pthread_mutex_unlock(&queue_mutex);
         }
         pthread_mutex_lock(&queue_mutex);
-        if (args->task_index >= args->num_tasks)
-        { // When all tasks are sent, we choose a thread to be the receiver and we lock the timer
-            if (!args->all_tasks_sent)
-            {
-                args->all_tasks_sent = true;
-                args->finish_time = time(NULL);
-                is_receiver = true;
-            }
-            pthread_mutex_unlock(&queue_mutex);
-            break;
-        }
         const uint16_t my_index = args->task_index++;
         pthread_mutex_unlock(&queue_mutex);
-
         args->tasks[my_index].start = time(NULL);
-        args->tasks[my_index].function(args->local_ip, args->sock, args->tasks[my_index].probe.address, my_index);
+        send_packet(args->local_ip, args->sock, args->tasks[my_index].probe);
         args->tasks[my_index].status = SENT;
-    }
-
-    // Dedicated thread (the one that sent the last task) handle the responses until the timeout
-    if (is_receiver)
-    {
-        printf("[*] All tasks sent. Waiting for responses...\n");
-        bool check_message = true;
-        while (check_message || (time(NULL) - args->finish_time) < TIMEOUT)
-        {
-            check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
+        if (args->task_index >= args->num_tasks && !args->all_tasks_sent) {
+            args->all_tasks_sent = true;
+            args->finish_time = time(NULL);
+            is_receiver = true; // This thread will be the receiver, checking for responses until the timeout
+            printf("[*] All tasks sent, waiting for responses...\n");
         }
-        // for some reason if we add a sleep here we miss some responses
-        printf("[*] Receiver thread finished.\n");
     }
     return NULL;
 }

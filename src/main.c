@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
     args.sock = setup_socket();
     args.handle = setup_handle(args.iface);
-    setup_filter(args.handle); // Needs to be improved A LOT
+    setup_filter(args.handle, args.local_ip); // Needs to be improved A LOT
 
     // SENDING (AND RECEIVING) THE PACKETS
 

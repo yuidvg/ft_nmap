@@ -24,7 +24,7 @@ void memory_manager_cleanup(void);
 
 // print
 const char *scan_type2str(const scan_type_t scan_type);
-void print_results(const t_task *tasks, const uint16_t num_tasks);
+void print_results(t_task *tasks, const uint16_t num_tasks);
 
 //receive
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks);
@@ -32,14 +32,14 @@ bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks);
 
 //send
 unsigned short checksum(unsigned short *ptr, int nbytes);
-void send_syn_packet(const char *local_ip, const int sock, const struct sockaddr_in test, const uint16_t i);
+void send_packet(const char *local_ip, const int sock, const probe_t p);
 udp_packet_t get_udp_packet_checksumed(const udp_packet_t unchecksumed_packet);
 
 // setup
 int get_local_ip_and_iface(char *iface, char *ip);
 int setup_socket();
 pcap_t *setup_handle(const char *iface);
-void setup_filter(pcap_t *handle);
+void setup_filter(pcap_t *handle, char *local_ip);
 
 // worker
 t_task *build_tasks(const probe_t*probes, const uint16_t num_probes);
