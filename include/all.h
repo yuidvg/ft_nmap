@@ -1,3 +1,4 @@
+/*
 #pragma once
 
 // Standard libc
@@ -116,12 +117,10 @@ void *worker(void *arg);
 //TEMPORARY
 t_probe *build_probes(const uint16_t num_probes);
 
-/*
 ////TODO
     Improve the way we handle timeouts (currently we're waiting until the last possible time, despite the fast that the last signal sent may have been answered already)
     Improve setup_filter to be more specific
     Improve error handling (errbuf, malloc returns, etc.)
-*/
 
 typedef struct
 {
@@ -129,3 +128,4 @@ typedef struct
     struct udphdr udp_header;
     uint8_t payload[24];
 } udp_packet_t;
+*/

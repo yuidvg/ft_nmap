@@ -119,7 +119,6 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
     }
 }
 
-
 bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks) {
     struct pcap_pkthdr *header;
     const u_char *packet;

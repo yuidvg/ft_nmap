@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
         }
     }
     worker((void *)&args);
-    for (int i = 0; i < config.number_of_threads; ++i)
+    for (int i = 0; i < config.number_of_threads; ++i)//shouldn't we wait for the main thread too?
     {
         pthread_join(threads[i], NULL);
     }
@@ -92,6 +92,3 @@ int main(int argc, char *argv[])
     pthread_mutex_destroy(&queue_mutex);
     return 0;
 }
-
-// sudo nmap -sS -p 80 scanme.nmap.org
-// sudo ./build/bin/ft_nmap 5
