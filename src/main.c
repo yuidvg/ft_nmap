@@ -43,11 +43,11 @@ t_probe *build_probes(uint16_t num_tasks) {
     const char *ips[] = {"45.33.32.156", "45.33.32.156", "8.8.8.8", "8.8.8.8"};
     // Initialize the probes with different scan types
     for (uint16_t i = 0; i < 4; i++) {
-        for (uint16_t j = 0; j < 5; j++) {
-            probes[i * 5 + j].scan_type = j;
-            probes[i * 5 + j].addr.sin_family = AF_INET;
-            probes[i * 5 + j].addr.sin_port = htons(ports[i]);
-            probes[i * 5 + j].addr.sin_addr.s_addr = inet_addr(ips[i]);
+        for (uint16_t j = 0; j < 6; j++) {
+            probes[i * 6 + j].scan_type = j;
+            probes[i * 6 + j].addr.sin_family = AF_INET;
+            probes[i * 6 + j].addr.sin_port = htons(ports[i]);
+            probes[i * 6 + j].addr.sin_addr.s_addr = inet_addr(ips[i]);
         }
     }
     return probes;
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 
 // SETUP
     t_thread_args args;
-    args.num_tasks = 20;    // TEMPORARY
+    args.num_tasks = 24;    // TEMPORARY
     const t_probe *probes = build_probes(args.num_tasks);
     if (DEBUG) printf("[*] Created %d probes\n", args.num_tasks);
 

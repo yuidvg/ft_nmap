@@ -10,5 +10,9 @@ nmap -sN -p $PORT $IP | grep "tcp"
 nmap -sA -p $PORT $IP | grep "tcp"
 nmap -sF -p $PORT $IP | grep "tcp"
 nmap -sX -p $PORT $IP | grep "tcp"
+nmap -sU -p $PORT $IP | grep "udp"
 
-#80 scanme.nmap.org
+#sudo sh script/nmap_all.sh 80 scanme.nmap.org
+#sudo sh script/nmap_all.sh 81 scanme.nmap.org
+#sudo sh script/nmap_all.sh 443 8.8.8.8
+#sudo sh script/nmap_all.sh 444 8.8.8.8

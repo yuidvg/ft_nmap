@@ -12,16 +12,21 @@ char *print_scan_type(const t_scan_types scan_type) {
             return "FIN";
         case XMAS:
             return "XMAS";
+        case UDP:
+            return "UDP";
         default:
             return "UNKNOWN";
     }
 }
             
 
-void print_results(const t_task *tasks, const uint16_t num_tasks) {
+void print_results(t_task *tasks, const uint16_t num_tasks) {
     printf("[*] Scan results:\n");
     for (uint16_t i = 0; i < num_tasks; i++) {
         const char *result_str;
+        if (tasks[i].result == FILTERED && tasks[i].probe.scan_type != SYN && tasks[i].probe.scan_type != ACK) { //tmp, can be done more cleanly
+            tasks[i].result = OPEN_FILTERED;
+        }
         switch (tasks[i].result) {
             case OPEN:
                 result_str = "OPEN      ";
@@ -42,6 +47,6 @@ void print_results(const t_task *tasks, const uint16_t num_tasks) {
                 result_str = "ERROR     ";
         }
         printf("%s | %s %s %d\n", result_str, print_scan_type(tasks[i].probe.scan_type), inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
-        if (i % 5 == 4) { printf("\n"); } // TEMP
+        if (i % 6 == 5) { printf("\n"); } // TEMP
     }
 }

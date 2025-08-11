@@ -9,7 +9,9 @@
 # include <time.h>
 // Posix stuff, not libc but pretty necessary. Still fits the spirit of the rule since it's portable
 # include <netinet/ip.h>
+# include <netinet/ip_icmp.h>
 # include <netinet/tcp.h>
+# include <netinet/udp.h>
 # include <netinet/in.h>
 # include <arpa/inet.h>
 # include <sys/socket.h>
@@ -26,7 +28,7 @@
 # define DEBUG 0
 # define DEFAULT_PORT 32800
 # ifndef TIMEOUT
-#  define TIMEOUT 3
+#  define TIMEOUT 2
 # endif
 
 typedef enum { false, true } bool;
@@ -91,7 +93,7 @@ typedef struct s_pseudo_header {
 }               t_pseudo_header;
 
 //print.c
-void print_results(const t_task *tasks, const uint16_t num_tasks);
+void print_results(t_task *tasks, const uint16_t num_tasks);
 
 //receive.c
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks);
@@ -120,3 +122,10 @@ t_probe *build_probes(const uint16_t num_probes);
     Improve setup_filter to be more specific
     Improve error handling (errbuf, malloc returns, etc.)
 */
+
+typedef struct
+{
+    struct ip ip_header;
+    struct udphdr udp_header;
+    uint8_t payload[24];
+} udp_packet_t;
