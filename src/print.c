@@ -29,24 +29,23 @@ void print_results(t_task *tasks, const uint16_t num_tasks) {
         }
         switch (tasks[i].result) {
             case OPEN:
-                result_str = "OPEN      ";
+                result_str = "OPEN          ";
                 break;
             case CLOSED:
-                result_str = "CLOSED    ";
+                result_str = "CLOSED        ";
                 break;
             case FILTERED:
-                result_str = "FILTERED  ";
+                result_str = "FILTERED      ";
                 break;
             case OPEN_FILTERED:
-                result_str = "OPEN|FILTERED";
+                result_str = "OPEN|FILTERED ";
                 break;
             case UNFILTERED:
-                result_str = "UNFILTERED";
+                result_str = "UNFILTERED    ";
                 break;
             default:
-                result_str = "ERROR     ";
+                result_str = "ERROR         ";
         }
         printf("%s | %s %s %d\n", result_str, print_scan_type(tasks[i].probe.scan_type), inet_ntoa(tasks[i].probe.addr.sin_addr), ntohs(tasks[i].probe.addr.sin_port));
-        if (i % 6 == 5) { printf("\n"); } // TEMP
     }
 }
