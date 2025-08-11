@@ -185,6 +185,44 @@ vm-clean:
 
 
 vm-restart: vm-clean vm-up
-.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart app-debug
+.PHONY: all app debug test clean re run-test vm-up vm-down vm-restart app-debug vm-exec vm-up-bg vm-stop integration-test-in-vm
+
+#-----------------------------------------------------------------------------------------------------------#
+# VM EXEC HELPERS (simple and optional)
+#-----------------------------------------------------------------------------------------------------------#
+# Start VM in background and wait for SSH (port 2223) to be ready
+vm-up-bg:
+\t@if pgrep -f "qemu-system" >/dev/null; then \\
+\t\t echo "VM seems running, skipping start"; \\
+\telse \\
+\t\t echo "Starting VM in background..."; \\
+\t\t nohup nix run --impure .#vm >/dev/null 2>&1 & echo $$! > .vm.pid; \\
+\tfi; \\
+\techo "Waiting for VM SSH (localhost:2223)..."; \\
+\tfor i in $$(seq 1 60); do \\
+\t\t if nc -z 127.0.0.1 2223 >/dev/null 2>&1; then echo "VM ready"; break; fi; \\
+\t\t sleep 1; \\
+\tdone
+
+vm-stop:
+\t@pkill -f "qemu-system" || true; \\
+\t [ -f .vm.pid ] && kill -9 $$(cat .vm.pid) 2>/dev/null || true; \\
+\t rm -f .vm.pid || true
+
+# Execute a command inside the running VM via forwarded SSH
+# Usage: make vm-exec CMD='echo hello'
+vm-exec:
+\t@[ -n "$(CMD)" ] || (echo "Usage: make vm-exec CMD='your command'" && exit 2)
+\t@ssh -p 2223 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@127.0.0.1 "$(CMD)" | cat
+
+#-----------------------------------------------------------------------------------------------------------#
+# INTEGRATION TEST (runs fully inside VM)
+#-----------------------------------------------------------------------------------------------------------#
+integration-test-in-vm:
+\t@echo "Running integration tests inside VM (auto-run)";
+\t@nix run --impure .#vm-test | cat
+
+# Run only integration tests inside the VM for simplicity
+test: integration-test-in-vm
 
 #-----------------------------------------------------------------------------------------------------------#

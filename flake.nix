@@ -40,6 +40,8 @@
           strace
           valgrind
           nodejs_20
+          ghc
+          cabal-install
         ];
     in
     {
@@ -186,6 +188,26 @@
           name = host;
           value = rec {
             vm = self.nixosConfigurations.${host}.config.system.build.vm;
+            vm-test = (nixpkgs.lib.nixosSystem {
+              system = "${builtins.head (builtins.split \"-\" host)}-linux";
+              modules = [
+                (self.nixosModules.mkVmHost (builtins.getAttr host nixpkgs.legacyPackages))
+                self.nixosModules.vmGuest
+                ({ pkgs, ... }: {
+                  # Run tests automatically on login and power off
+                  services.getty.autologinUser = "root";
+                  environment.loginShellInit = ''
+                    set -euxo pipefail
+                    cd /workspace
+                    make -j app
+                    cd @test/haskell
+                    cabal v2-update
+                    cabal v2-run ftnmap-tests
+                    poweroff -f
+                  '';
+                })
+              ];
+            }).config.system.build.vm;
             default = vm;
           };
         }) hostSystems
