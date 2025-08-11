@@ -34,3 +34,4 @@ simple_test
 test_ips
 build/
 compile_commands.json
+dist-newstyle/
