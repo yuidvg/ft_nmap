@@ -218,9 +218,6 @@ udp_packet_t build_udp_packet(struct sockaddr_in destination, const char *local_
                            },
                        .payload = {0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10}};
-    printf("[---] Building UDP packet to %s:%d with payload length %zu\n", inet_ntoa(destination.sin_addr), ntohs(destination.sin_port), payload_len);
-    printf("[---] ip_src = %s, ip_dst = %s\n", inet_ntoa(packet.ip_header.ip_src), inet_ntoa(packet.ip_header.ip_dst));
-    printf("[---] ud_dport = %d, ud_sport = %d\n", ntohs(packet.udp_header.uh_dport), ntohs(packet.udp_header.uh_sport));
     return packet;
 }
 
