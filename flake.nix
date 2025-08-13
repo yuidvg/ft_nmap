@@ -203,66 +203,10 @@
             in
             rec {
               vm = self.nixosConfigurations.${host}.config.system.build.vm;
-              # Build the Haskell e2e executable defined in test/e2e/e2e.cabal (manual wiring, no cabal2nix)
-              e2e = pkgsFor.haskellPackages.mkDerivation {
-                pname = "e2e";
-                version = "0.1.0.0";
-                # Use builtins.path to include even if the test dir is not tracked by Git yet
-                src = builtins.path {
-                  path = ./test/e2e;
-                  name = "e2e-src";
-                };
-                isLibrary = false;
-                isExecutable = true;
-                executableHaskellDepends = with pkgsFor.haskellPackages; [
-                  base
-                  tasty
-                  tasty-hunit
-                  process
-                  directory
-                  containers
-                ];
-                license = pkgsFor.lib.licenses.bsd3;
-                description = "ft_nmap end-to-end tests";
-                doCheck = false;
-              };
+              e2e = pkgsFor.haskellPackages.callCabal2nix "e2e" (self + "/test/e2e") { };
               default = vm;
             };
         }) hostSystems
-      );
-      # App to run Haskell e2e tests in one shot: `nix run .#e2e`
-      apps = builtins.listToAttrs (
-        map (
-          system:
-          let
-            pkgsFor = import nixpkgs { inherit system; };
-            e2eDrv = self.packages.${system}.e2e;
-            # Wrap the built e2e binary to ensure runtime deps (like nmap) are on PATH
-            runner = pkgsFor.writeShellApplication {
-              name = "ftnmap-e2e";
-              runtimeInputs = [ pkgsFor.nmap ];
-              text = ''
-                set -euo pipefail
-                # Run from repo root so relative fixtures like script/res/correct_output.txt resolve
-                cd ${self}
-                exec ${e2eDrv}/bin/e2e "$@"
-              '';
-            };
-          in
-          {
-            name = system;
-            value = {
-              e2e = {
-                type = "app";
-                program = "${runner}/bin/ftnmap-e2e";
-              };
-              default = {
-                type = "app";
-                program = "${runner}/bin/ftnmap-e2e";
-              };
-            };
-          }
-        ) hostSystems
       );
       # Development shell
       devShells = builtins.listToAttrs (

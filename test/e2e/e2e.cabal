@@ -16,6 +16,8 @@ executable e2e
     base >=4.14 && <5,
     containers,
     directory,
+    filepath,
+    hxt,
     process,
     tasty,
     tasty-hunit,
