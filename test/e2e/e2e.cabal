@@ -7,8 +7,15 @@ executable e2e
   hs-source-dirs: .
   main-is: Main.hs
   default-language: GHC2021
+  default-extensions:
+    DuplicateRecordFields
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+
   ghc-options:
     -Wall
+    -Wextra
     -Werror
     -O2
 

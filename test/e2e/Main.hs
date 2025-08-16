@@ -1,75 +1,91 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Main where
 
-import Data.Char
-import Data.List
+import Data.Bifunctor
+import Data.Functor
+import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
 import System.Directory ()
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.XML.HXT.Core
 
--- HTTP handler import removed; we prefer local data-files
-
 -- Normalized state used by comparisons
 data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown
   deriving (Eq, Show)
 
-type Key = (String, Int) -- (ip, port)
+-- Hierarchical structure for a host's port entry
+data PortInfo = PortInfo
+  { protocol :: String,
+    state :: PortState,
+    serviceName :: String
+  }
+  deriving (Eq, Show)
 
-type Snapshot = M.Map Key PortState
+data Port = Port
+  { id :: Int,
+    protocol :: String,
+    state :: PortState,
+    serviceName :: String
+  }
+  deriving (Eq, Show)
 
-trim :: String -> String
-trim = dropWhileEnd isSpace . dropWhile isSpace
+-- New nested Map structure
+type HostIP = String
 
--- Pure extraction pipeline: XmlTree -> ((ip,port), state)
-nmapPairs :: (ArrowXml a) => a XmlTree ((String, Int), PortState)
-nmapPairs =
+type Ports = IM.IntMap PortInfo
+
+type NmapXMLParseResult = [(HostIP, Ports)]
+
+type Hosts = M.Map HostIP Ports
+
+type ScanResult = Hosts
+
+parseInt :: String -> Int
+parseInt s =
+  case reads s of
+    [(n, _)] -> n
+    _ -> 0
+
+nmapXMLStructure :: (ArrowXml a) => a XmlTree Hosts
+nmapXMLStructure =
   deep (isElem >>> hasName "host")
-    >>> ( listA
-            ( getChildren
-                >>> isElem
-                >>> hasName "address"
-                >>> hasAttrValue "addrtype" (== "ipv4")
-                >>> getAttrValue "addr"
-            )
-            &&&
-            listA
-              ( getChildren
-                  >>> isElem
-                  >>> hasName "ports"
-                  >>> getChildren
-                  >>> isElem
-                  >>> hasName "port"
-                  >>> ( getAttrValue "portid"
-                          &&& ( getChildren
-                                  >>> isElem
-                                  >>> hasName "state"
-                                  >>> getAttrValue "state"
-                              )
-                      )
-              )
-        )
-    >>> arrL
-      ( \(ips, portPairs) ->
-          [ ((ip, parseInt portStr), parsePortState stateStr)
-          | ip <- ips
-          , (portStr, stateStr) <- portPairs
-          ]
-      )
+    >>> listA (ipA &&& listA portA)
+    >>> arr (M.fromListWith IM.union . map (Data.Bifunctor.second IM.fromList))
+  where
+    ipA =
+      getChildren
+        >>> isElem
+        >>> hasName "address"
+        >>> hasAttrValue "addrtype" (== "ipv4")
+        >>> getAttrValue "addr"
 
--- IO boundary: parse from XML string
-parseNmapResultFromFile :: FilePath -> IO Snapshot
-parseNmapResultFromFile xmlPath = do
-  xmlRaw <- readFile xmlPath
-  let opts =
-        [ withValidate no
-        , withSubstDTDEntities no
-        , withRemoveWS yes
-        ]
-  pairs <- runX (readString opts xmlRaw >>> nmapPairs)
-  pure (M.fromList pairs)
+    portA =
+      getChildren
+        >>> isElem
+        >>> hasName "ports"
+        >>> getChildren
+        >>> isElem
+        >>> hasName "port"
+        >>> ( getAttrValue "portid"
+                &&& getAttrValue "protocol"
+                &&& (getChildren >>> isElem >>> hasName "state" >>> getAttrValue "state")
+                &&& (getChildren >>> isElem >>> hasName "service" >>> getAttrValue "name")
+            )
+        >>> arr
+          ( \(portIdStr, (protocolStr, (stateStr, serviceName))) ->
+              ( parseInt portIdStr,
+                PortInfo protocolStr (parsePortState stateStr) serviceName
+              )
+          )
+
+-- IO boundary: parse from XML string and convert to nested Map
+parseNmapResultFromFile :: FilePath -> IO ScanResult
+parseNmapResultFromFile xmlPath =
+  readFile xmlPath >>= \xmlRaw ->
+    runX (readString opts xmlRaw >>> nmapXMLStructure) Data.Functor.<&> mergeHostMaps
+  where
+    opts = [withValidate no, withSubstDTDEntities no, withRemoveWS yes]
+    mergeHostMaps = M.unionsWith IM.union
 
 parsePortState :: String -> PortState
 parsePortState s
@@ -78,45 +94,15 @@ parsePortState s
   | s == "filtered" = StateFiltered
   | otherwise = StateUnknown
 
-parseInt :: String -> Int
-parseInt s =
-  case reads s of
-    [(n, _)] -> n
-    _ -> 0
-
--- Assert helper
-assertHas :: Snapshot -> (Key, PortState) -> Assertion
-assertHas snap (k, v) =
-  case M.lookup k snap of
-    Just v' -> assertEqual ("state for " ++ show k) v v'
-    Nothing -> assertFailure ("missing key " ++ show k)
-
-main :: IO ()
-main = do
-  snapDbg <- parseNmapResultFromFile "/Users/yui/Developer/42/ft_nmap/test/e2e/nmap_result.xml"
-  print (M.toList snapDbg)
-  defaultMain tests
-
 tests :: TestTree
 tests =
   testGroup
     "ft_nmap e2e parser"
     [ testCase "parse single OPEN line" $ do
-        snap <- parseNmapResultFromFile "/Users/yui/Developer/42/ft_nmap/test/e2e/nmap_result.xml"
-        print (M.toList snap)
-        assertHas snap (("1.1.1.1", 53), StateOpen)
+        snap1 <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+        snap2 <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+        assertEqual "command 1" snap1 snap2
     ]
 
--- small utilities (without bringing extra deps)
-mapMaybe :: (a -> Maybe b) -> [a] -> [b]
-mapMaybe f = foldr (\x acc -> maybe acc (: acc) (f x)) []
-
-filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-filterM p =
-  foldr
-    ( \x r -> do
-        b <- p x
-        xs <- r
-        pure (if b then x : xs else xs)
-    )
-    (pure [])
+main :: IO ()
+main = defaultMain tests
