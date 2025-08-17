@@ -1,6 +1,5 @@
 module Main where
 
-import Data.Bifunctor
 import Data.Functor
 import Data.IntMap qualified as IM
 import Data.Map.Strict qualified as M
@@ -10,20 +9,23 @@ import Test.Tasty.HUnit
 import Text.XML.HXT.Core
 
 -- Normalized state used by comparisons
-data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown
+data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown | StateOpenFiltere
   deriving (Eq, Show)
 
 -- Hierarchical structure for a host's port entry
 data PortInfo = PortInfo
-  { protocol :: String,
+  { protocol :: Protocol,
     state :: PortState,
     serviceName :: String
   }
   deriving (Eq, Show)
 
+data Protocol = UDP | TCP
+  deriving (Eq, Show)
+
 data Port = Port
   { id :: Int,
-    protocol :: String,
+    protocol :: Protocol,
     state :: PortState,
     serviceName :: String
   }
@@ -46,11 +48,35 @@ parseInt s =
     [(n, _)] -> n
     _ -> 0
 
-nmapXMLStructure :: (ArrowXml a) => a XmlTree Hosts
+parseProtocol :: String -> Protocol
+parseProtocol s
+  | s == "udp" = UDP
+  | otherwise = TCP
+
+-- Simple splitOn for single-character delimiters
+splitOn :: Char -> String -> [String]
+splitOn _ "" = [""]
+splitOn delim s =
+  let (chunk, rest) = break (== delim) s
+   in case rest of
+        [] -> [chunk]
+        (_ : r) -> chunk : splitOn delim r
+
+portRangeStr2Ports :: String -> [Int]
+portRangeStr2Ports s =
+  case splitOn '-' s of
+    [start, end] -> [read start .. read end]
+    _ -> []
+
+portRangesStr2Ports :: String -> [Int]
+portRangesStr2Ports s =
+  concatMap portRangeStr2Ports (splitOn ',' s)
+
+nmapXMLStructure :: (ArrowXml a) => a XmlTree ScanResult
 nmapXMLStructure =
   deep (isElem >>> hasName "host")
-    >>> listA (ipA &&& listA portA)
-    >>> arr (M.fromListWith IM.union . map (Data.Bifunctor.second IM.fromList))
+    >>> listA (ipA &&& portsA)
+    >>> arr M.fromList
   where
     ipA =
       getChildren
@@ -59,23 +85,42 @@ nmapXMLStructure =
         >>> hasAttrValue "addrtype" (== "ipv4")
         >>> getAttrValue "addr"
 
-    portA =
+    portsA =
       getChildren
         >>> isElem
         >>> hasName "ports"
-        >>> getChildren
-        >>> isElem
-        >>> hasName "port"
-        >>> ( getAttrValue "portid"
-                &&& getAttrValue "protocol"
-                &&& (getChildren >>> isElem >>> hasName "state" >>> getAttrValue "state")
-                &&& (getChildren >>> isElem >>> hasName "service" >>> getAttrValue "name")
+        >>> (normalPortsA &&& extraPortsA)
+        >>> arr (uncurry IM.union)
+
+    normalPortsA :: (ArrowXml a) => a XmlTree Ports
+    normalPortsA =
+      listA
+        ( deep (isElem >>> hasName "port")
+            >>> ( getAttrValue "portid"
+                    &&& getAttrValue "protocol"
+                    &&& (getChildren >>> isElem >>> hasName "state" >>> getAttrValue "state")
+                    &&& (getChildren >>> isElem >>> hasName "service" >>> getAttrValue "name")
+                )
+            >>> arr
+              ( \(portIdStr, (protocolStr, (stateStr, serviceName))) ->
+                  ( parseInt portIdStr,
+                    PortInfo (parseProtocol protocolStr) (parsePortState stateStr) serviceName
+                  )
+              )
+        )
+        >>> arr IM.fromList
+
+    extraPortsA :: (ArrowXml a) => a XmlTree Ports
+    extraPortsA =
+      deep (isElem >>> hasName "extraports")
+        >>> ( getAttrValue "state"
+                &&& (getChildren >>> isElem >>> hasName "extrareasons" >>> (getAttrValue "ports" &&& getAttrValue "proto"))
             )
         >>> arr
-          ( \(portIdStr, (protocolStr, (stateStr, serviceName))) ->
-              ( parseInt portIdStr,
-                PortInfo protocolStr (parsePortState stateStr) serviceName
-              )
+          ( \(stateStr, (portsStr, protoStr)) ->
+              let state = parsePortState stateStr
+                  ports = portRangesStr2Ports portsStr
+               in IM.fromList $ map (,PortInfo (parseProtocol protoStr) state "") ports
           )
 
 -- IO boundary: parse from XML string and convert to nested Map
@@ -99,8 +144,8 @@ tests =
   testGroup
     "ft_nmap e2e parser"
     [ testCase "parse single OPEN line" $ do
-        snap1 <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
-        snap2 <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+        snap1 <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
+        snap2 <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
         assertEqual "command 1" snap1 snap2
     ]
 
