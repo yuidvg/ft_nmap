@@ -175,9 +175,9 @@ tests =
   testGroup
     "ft_nmap e2e parser"
     [ testCase "nmap -oX ./test/e2e/nmap_result2.xml -sS -sU 1.1.1.1 google.com vs nmap -sS -oX &quot;nmap_result sudo nmap 1.1.1.1 google.com -sS -oX&quot; 1.1.1.1 google.com" $ do
-        snapA <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        snapB <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
-        let extraHosts = extraHostsOnA snapA snapB
+        nmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+        ftNmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
+        let extraHosts = extraHostsOnA nmapResult ftNmapResult
         unless (M.null extraHosts) $ assertFailure ("missing hosts: " ++ unlines (map show $ M.keys extraHosts))
     ]
 
