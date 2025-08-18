@@ -9,7 +9,7 @@ import Test.Tasty.HUnit
 import Text.XML.HXT.Core
 
 -- Normalized state used by comparisons
-data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown | StateOpenFiltere
+data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown | StateOpenFiltered | StateClosedFiltered
   deriving (Eq, Show)
 
 -- Hierarchical structure for a host's port entry
@@ -137,16 +137,18 @@ parsePortState s
   | s == "open" = StateOpen
   | s == "closed" = StateClosed
   | s == "filtered" = StateFiltered
+  | s == "open|filtered" = StateOpenFiltered
+  | s == "closed|filtered" = StateClosedFiltered
   | otherwise = StateUnknown
 
 tests :: TestTree
 tests =
   testGroup
     "ft_nmap e2e parser"
-    [ testCase "parse single OPEN line" $ do
-        snap1 <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        snap2 <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        assertEqual "command 1" snap1 snap2
+    [ testCase "parse single OPEN line" $
+        parseNmapResultFromFile "./test/e2e/nmap_result.xml" >>= \snap1 ->
+          parseNmapResultFromFile "./test/e2e/nmap_result.xml" >>= \snap2 ->
+            assertEqual "command 1" snap1 snap2
     ]
 
 main :: IO ()
