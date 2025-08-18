@@ -1,7 +1,8 @@
 module Main where
 
+import Control.Monad (unless)
 import Data.Functor
-import Data.IntMap qualified as IM
+import Data.IntMap.Strict qualified as IM
 import Data.Map.Strict qualified as M
 import System.Directory ()
 import Test.Tasty
@@ -36,11 +37,13 @@ type HostIP = String
 
 type Ports = IM.IntMap PortInfo
 
-type NmapXMLParseResult = [(HostIP, Ports)]
-
 type Hosts = M.Map HostIP Ports
 
 type ScanResult = Hosts
+
+-- ---------------------------------------
+-- PARSER
+-- ---------------------------------------
 
 parseInt :: String -> Int
 parseInt s =
@@ -141,14 +144,41 @@ parsePortState s
   | s == "closed|filtered" = StateClosedFiltered
   | otherwise = StateUnknown
 
+-- ---------------------------------------
+-- DIFF
+-- ---------------------------------------
+
+extraHostsOnA :: Hosts -> Hosts -> Hosts
+extraHostsOnA = M.difference
+
+extraPortsOnA :: Ports -> Ports -> Ports
+extraPortsOnA = IM.difference
+
+diffsOnPortsPair :: Ports -> Ports -> IM.IntMap (PortInfo, PortInfo)
+diffsOnPortsPair portsA portsB =
+  IM.mapMaybeWithKey
+    ( \portId portInfoA ->
+        case IM.lookup portId portsB of
+          Just portInfoB | portInfoA.state /= portInfoB.state -> Just (portInfoA, portInfoB)
+          _ -> Nothing
+    )
+    portsA
+
+
+
+-- ---------------------------------------
+-- TESTS
+-- ---------------------------------------
+
 tests :: TestTree
 tests =
   testGroup
     "ft_nmap e2e parser"
-    [ testCase "parse single OPEN line" $
-        parseNmapResultFromFile "./test/e2e/nmap_result.xml" >>= \snap1 ->
-          parseNmapResultFromFile "./test/e2e/nmap_result.xml" >>= \snap2 ->
-            assertEqual "command 1" snap1 snap2
+    [ testCase "nmap -oX ./test/e2e/nmap_result2.xml -sS -sU 1.1.1.1 google.com vs nmap -sS -oX &quot;nmap_result sudo nmap 1.1.1.1 google.com -sS -oX&quot; 1.1.1.1 google.com" $ do
+        snapA <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
+        snapB <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+        let extraHosts = extraHostsOnA snapA snapB
+        unless (M.null extraHosts) $ assertFailure ("missing hosts: " ++ unlines (map show $ M.keys extraHosts))
     ]
 
 main :: IO ()

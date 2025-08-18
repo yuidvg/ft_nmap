@@ -26,6 +26,7 @@ executable e2e
     filepath,
     hxt,
     process,
+    semialign,
     tasty,
     tasty-hunit,
-
+    these,
