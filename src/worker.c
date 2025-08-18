@@ -16,7 +16,10 @@ t_task *build_tasks(const probe_t *probes, const uint16_t num_tasks)
     {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
-        tasks[i].result = FILTERED;// change the default result in relation to the scan type instead of doing it in print_results
+        if (probes[i].scan_type == SCAN_TYPE_SYN || probes[i].scan_type == SCAN_TYPE_ACK)
+            tasks[i].result = FILTERED;
+        else
+            tasks[i].result = OPEN_FILTERED;
     }
     return tasks;
 }
@@ -53,6 +56,7 @@ void *worker(void* arg) {
     return NULL;
 }
 */
+
 void* worker(void* arg) {
     t_thread_args *args = (t_thread_args*)arg;
     bool is_receiver = false;

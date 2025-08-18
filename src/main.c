@@ -15,7 +15,6 @@ int main(int argc, char *argv[])
 
     printf("  ip_address: %s\n", command_line_args.ip_address ? command_line_args.ip_address : "(null)");
     printf("  file_path: %s\n", command_line_args.file_path ? command_line_args.file_path : "(null)");
-
     // printf("  ports:\n");
     // for (size_t i = 0; i < PORTS_MAX && command_line_args.ports[i] != PORT_UNDEFINED; ++i)
     //     printf("    [%zu]: %d\n", i, command_line_args.ports[i]);
@@ -24,18 +23,18 @@ int main(int argc, char *argv[])
     const probe_t *const probes = config2probes(config);
 
     /* Print probe_infos for debugging/verification */
-    printf("\nProbe infos:\n");
+    if (DEBUG) {
+        printf("\nProbe infos:\n");
+        for (size_t i = 0; probes[i].scan_type != 0; ++i)
+        {
+            const probe_t probe = probes[i];
+            const char *const ip_str = inet_ntoa(probe.address.sin_addr);
 
-    for (size_t i = 0; probes[i].scan_type != 0; ++i)
-    {
-        const probe_t probe = probes[i];
-        const char *const ip_str = inet_ntoa(probe.address.sin_addr);
+            const int port = ntohs(probe.address.sin_port);
 
-        const int port = ntohs(probe.address.sin_port);
-
-        printf("  [%zu]: %s:%d (scan_type: %s)\n", i, ip_str, port, scan_type2str(probe.scan_type));
+            printf("  [%zu]: %s:%d (scan_type: %s)\n", i, ip_str, port, scan_type2str(probe.scan_type));
+        }
     }
-
     // SETUP
     t_thread_args args;
     args.num_tasks = count_probes(probes);
@@ -85,7 +84,7 @@ int main(int argc, char *argv[])
     }
 
     // RESULTS AND CLEANUP
-    print_results(args.tasks, args.num_tasks); // Print the results of the scan
+    print_results(args.tasks, args.num_tasks, config); // Print the results of the scan
 
     pcap_close(args.handle);
     close(args.sock);

@@ -23,8 +23,8 @@ void *safe_malloc_or_exit(const size_t size);
 void memory_manager_cleanup(void);
 
 // print
-const char *scan_type2str(const scan_type_t scan_type);
-void print_results(t_task *tasks, const uint16_t num_tasks);
+char *scan_type2str(const scan_type_t scan_type);
+void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config_t config);
 
 //receive
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks);
