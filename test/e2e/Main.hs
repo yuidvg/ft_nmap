@@ -3,10 +3,12 @@ module Main where
 import Control.Monad
 import Data.Align
 import Data.Functor
+import System.FilePath
 import Data.IntMap.Strict qualified as IM
 import Data.Map.Strict qualified as M
 import Data.These
-import System.Directory ()
+import System.IO.Temp
+import System.Process
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Show.Pretty
@@ -192,7 +194,6 @@ extraHostsOnA = M.difference
 extraPortsOnA :: Ports -> Ports -> Ports
 extraPortsOnA = IM.difference
 
-
 pruneHappyPaths :: AlignedScanResult -> AlignedScanResult
 pruneHappyPaths = M.mapMaybe pruneHost
   where
@@ -200,33 +201,66 @@ pruneHappyPaths = M.mapMaybe pruneHost
     pruneHost (HostInBoth alignedPorts) =
       let -- ポートレベルで差分がないものをフィルタリング
           portDiffs = IM.filter (not . isBothSame) alignedPorts
-      in if IM.null portDiffs
-           then Nothing -- ポート差分がなければホストごと消す
-           else Just (HostInBoth portDiffs)
+       in if IM.null portDiffs
+            then Nothing -- ポート差分がなければホストごと消す
+            else Just (HostInBoth portDiffs)
     -- Aのみ、Bのみのホストは差分なのでそのまま残す
     pruneHost diff = Just diff
 
     -- PortInfoのstateが同じBothはハッピーパス
     isBothSame :: AlignedPort -> Bool
     isBothSame (PortInBoth a b) = a.state == b.state
-    isBothSame _          = False -- This, Thatは差分
+    isBothSame _ = False -- This, Thatは差分
 
 -- ---------------------------------------
 -- TESTS
 -- ---------------------------------------
 
+data TestCase = TestCase
+  { nmapArgs :: [String],
+    ftNmapArgs :: [String]
+  }
+  deriving (Show)
+
+testcases :: [TestCase]
+testcases =
+  [ TestCase
+      { ftNmapArgs = ["-sS", "1.1.1.1", "-p", "22,80"],
+        nmapArgs = ["-sS", "1.1.1.1", "-p", "22,80,30"]
+      },
+    TestCase
+      { ftNmapArgs = ["-sU", "google.com", "-p", "53"],
+        nmapArgs = ["-sU", "google.com", "-p", "53"]
+      }
+      -- ... add Test Cases Here
+  ]
+
+conductTest :: TestCase -> Assertion
+conductTest testCase' =
+ withSystemTempDirectory "nmap-e2e-test-" $ \tempDir -> do
+    -- 作成したディレクトリの中に、出力先のファイルパスを構築する
+    let nmapResultPath = tempDir </> "nmap_result.xml"
+        ftNmapResultPath = tempDir </> "ft_nmap_result.xml"
+
+    -- nmapとft_nmapをそれぞれ実行し、専用のファイルに書き込ませる
+    -- 注意：元のコードでは両方とも "nmap" になっていたので修正
+    callProcess "nmap"    (testCase'.nmapArgs    ++ ["-oX", nmapResultPath])
+    callProcess "nmap" (testCase'.ftNmapArgs ++ ["-oX", ftNmapResultPath])
+
+    -- 以降の処理は変更なし
+    nmapResult <- parseNmapResultFromFile nmapResultPath
+    ftNmapResult <- parseNmapResultFromFile ftNmapResultPath
+
+    let scanResultDiff = pruneHappyPaths $ deepAlign nmapResult ftNmapResult
+
+    unless (M.null scanResultDiff) $
+      assertFailure ("scanResultDiff: " ++ ppShow scanResultDiff)
+
 tests :: TestTree
 tests =
   testGroup
     "RESULT COMPARISON"
-    [ testCase "Parse nmap_result3.xml (with extraports)" $ do
-        nmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        ftNmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
-        let scanResultDiff = pruneHappyPaths $ deepAlign nmapResult ftNmapResult
-
-        unless (M.null scanResultDiff) $
-          assertFailure ("scanResultDiff: " ++  ppShow scanResultDiff)
-    ]
+    (map (\tc -> testCase (show tc) (conductTest tc)) testcases)
 
 main :: IO ()
 main = defaultMain tests

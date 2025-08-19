@@ -30,4 +30,5 @@ executable e2e
     semialign,
     tasty,
     tasty-hunit,
+    temporary,
     these,

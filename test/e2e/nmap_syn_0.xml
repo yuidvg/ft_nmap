@@ -17,7 +17,7 @@
 		</hostnames>
 		<ports>
 			<port protocol="tcp" portid="10">
-				<state state="filtered" reason="no-response" reason_ttl="0" />
+				<state state="closed" reason="no-response" reason_ttl="0" />
 			</port>
 			<port protocol="tcp" portid="11">
 				<state state="filtered" reason="no-response" reason_ttl="0" />
