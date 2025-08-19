@@ -245,7 +245,7 @@ conductTest testCase' =
     -- nmapとft_nmapをそれぞれ実行し、専用のファイルに書き込ませる
     -- 注意：元のコードでは両方とも "nmap" になっていたので修正
     callProcess "nmap"    (testCase'.nmapArgs    ++ ["-oX", nmapResultPath])
-    callProcess "nmap" (testCase'.ftNmapArgs ++ ["-oX", ftNmapResultPath])
+    callProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["-oX", ftNmapResultPath])
 
     -- 以降の処理は変更なし
     nmapResult <- parseNmapResultFromFile nmapResultPath
