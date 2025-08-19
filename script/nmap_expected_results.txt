@@ -58,3 +58,14 @@ user@DESKTOP-GF91133:~/ft_nmap$ sudo sh script/nmap_all.sh 444 8.8.8.8
 444/tcp open|filtered snpp
 444/tcp open|filtered snpp
 444/udp open|filtered snpp
+
+
+___
+
+53/udp    open   domain
+1434/udp  closed ms-sql-m
+18683/udp closed unknown
+20848/udp closed unknown
+21358/udp closed unknown
+30303/udp closed unknown
+33459/udp closed unknown 

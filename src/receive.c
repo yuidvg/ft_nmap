@@ -28,8 +28,9 @@ void parse_stealth(t_task *task, const struct tcphdr *rtcp) { // NUL, FIN, XMAS
         task->result = OPEN_FILTERED;
     }
 }
-
+/*
 void parse_udp(t_task *task, const struct tcphdr *rtcp) {
+    printf("jsp");
     if (rtcp->th_flags & TH_ACK) {
         task->result = OPEN;
     } else if (rtcp->th_flags & TH_RST) {
@@ -38,7 +39,7 @@ void parse_udp(t_task *task, const struct tcphdr *rtcp) {
         task->result = FILTERED;
     }
 }
-
+*/
 int get_task_index(const t_task *tasks, const uint16_t num_tasks, const struct in_addr ip, const uint16_t port, const uint16_t host_port, const int protocol) {
     for (uint16_t i = 0; i < num_tasks; i++) {
         if (tasks[i].status == COMPLETED) continue;
@@ -86,9 +87,11 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
                 case SCAN_TYPE_XMAS:
                     parse_stealth(&tasks[i], rtcp);
                     break;
+                /*
                 case SCAN_TYPE_UDP:
                     parse_udp(&tasks[i], rtcp);
                     break;
+                */
                 default:
                     fprintf(stderr, "Unknown scan type for task %d\n", i);
             }
@@ -96,6 +99,7 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
             //if (DEBUG) printf("Task %d completed has service %s\n", i, service_name(ntohs(rtcp->th_sport), "tcp"));
         }
     } else if (rip->ip_p == IPPROTO_ICMP) {
+        if (DEBUG) printf("--- RECEIVED ICMP ANSWER ---\n");
         const struct icmp *ricmp = (struct icmp *)((u_char *)rip + (rip->ip_hl << 2));
         if (ricmp->icmp_type == ICMP_UNREACH && ricmp->icmp_code == ICMP_UNREACH_PORT) {
             const struct ip *orig_ip = (struct ip *)(ricmp->icmp_data);
@@ -109,6 +113,8 @@ void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks) 
                 }
             }
         }
+    } else if (rip->ip_p == IPPROTO_UDP) {
+        if (DEBUG) printf("--- RECEIVED UDP ANSWER ---\n");
     }
 }
 

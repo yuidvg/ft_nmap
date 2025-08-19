@@ -5,6 +5,10 @@
 #define FILTERED_PORTS 1 << 2
 #define SCAN_NUMBER 6
 
+//change to flags later
+#define DISPLAY_FILTERED 1
+#define TEST_DISPLAY 1
+
 char *service_name(const uint16_t port, const char *protocol) {
     struct servent *se;
     se = getservbyport(htons(port), protocol); // "tcp" or "udp"
@@ -34,21 +38,40 @@ char *scan_type2str(const scan_type_t scan_type)
     }
 }
 
+char *scan_family2str(const scan_type_t scan_type)
+{
+    switch (scan_type)
+    {
+    case SCAN_TYPE_SYN:
+    case SCAN_TYPE_NULL:
+    case SCAN_TYPE_ACK:
+    case SCAN_TYPE_FIN:
+    case SCAN_TYPE_XMAS:
+        return "tcp";
+    case SCAN_TYPE_UDP:
+        return "udp";
+    case SCAN_TYPE_ALL:
+        return "tcp upd";
+    default:
+        return "Error";
+    }
+}
+
 char *result2str(const t_result result)
 {
     switch (result) {
         case OPEN:
-            return "Open";
+            return "open";
         case CLOSED:
-            return "Closed";
+            return "closed";
         case FILTERED:
-            return "Filtered";
+            return "filtered";
         case OPEN_FILTERED:
-            return "Open|Filtered";
+            return "open|filtered";
         case UNFILTERED:
-            return "Unfiltered";
+            return "unfiltered";
         default:
-            return "Error";
+            return "error";
     }
 }
 
@@ -63,7 +86,9 @@ bool is_ignored_state(t_result result, const scan_type_t scan_type) {
         case SCAN_TYPE_XMAS:
             return result == OPEN_FILTERED;
         case SCAN_TYPE_UDP:
-            return result == FILTERED;
+            return result == OPEN_FILTERED;
+        case SCAN_TYPE_ALL:
+            return result == OPEN_FILTERED || result == FILTERED;
         default:
             return false;
     }
@@ -82,17 +107,11 @@ uint8_t get_ports_status(const t_task *tasks, const uint16_t start_index, const 
     uint8_t status = 0;
     for (uint16_t i = start_index; i < start_index + ports_num; i++) {
         bool ignored_state = is_ignored_state(tasks[i].result, tasks[i].probe.scan_type);
-        if (scan_type == SCAN_TYPE_ALL) {
-            for (uint16_t j = 1; j < SCAN_NUMBER; j++) {
-                if (ignored_state)
-                    ignored_state = is_ignored_state(tasks[i + j].result, tasks[i + j].probe.scan_type);
-            }
-        }
         if (tasks[i].result == OPEN && (status & OPEN_PORTS) == 0) {
             status += OPEN_PORTS;
-        } else if (!ignored_state && (status & CLOSED_PORTS) == 0) {
+        } else if (tasks[i].result != OPEN && !ignored_state && (status & CLOSED_PORTS) == 0) {
             status += CLOSED_PORTS;
-        } else if (ignored_state && (status & FILTERED_PORTS) == 0) {
+        } else if (ignored_state && (status & FILTERED_PORTS) == 0 /*&& DISPLAY_FILTERED*/) {
             status += FILTERED_PORTS;
         }
         if (scan_type == SCAN_TYPE_ALL)
@@ -112,7 +131,12 @@ void print_banner(char *str, bool newline) {
 void print_result(const t_task *tasks, const uint16_t i, const scan_type_t scan_type) {
     const uint16_t port = ntohs(tasks[i].probe.address.sin_port);
     char result_str[20*SCAN_NUMBER];
-    sprintf(result_str, "%s(%s)", scan_type2str(tasks[i].probe.scan_type), result2str(tasks[i].result));
+
+    if (TEST_DISPLAY && scan_type != SCAN_TYPE_ALL) {
+        sprintf(result_str, "%s %s", scan_family2str(tasks[i].probe.scan_type), result2str(tasks[i].result));
+    } else {
+        sprintf(result_str, "%s(%s)", scan_type2str(tasks[i].probe.scan_type), result2str(tasks[i].result));
+    }
     if (scan_type == SCAN_TYPE_ALL) {
         for (uint16_t j = 1; j <= SCAN_NUMBER - 1; j++) {
             sprintf(result_str, "%s, %s(%s)", result_str, scan_type2str(tasks[i + j].probe.scan_type), result2str(tasks[i + j].result));
@@ -120,7 +144,11 @@ void print_result(const t_task *tasks, const uint16_t i, const scan_type_t scan_
     }
     const char *service_name_str = service_name(port, scan_type == SCAN_TYPE_UDP ? "udp" : "tcp");//should we use both for SCAN_TYPE_ALL? - ALSO, THIS TAKES A LOT OF TIME, DO WITH THREADS AND IN A BETTER PLACE
     const char *conclusion_str = result2str(tasks[i].result);
-    printf("%-10d %-20s %-19s %s\n", port, service_name_str, conclusion_str, result_str);
+    if (TEST_DISPLAY && scan_type != SCAN_TYPE_ALL) {
+        printf("%d %s %s\n", port, result_str, service_name_str);
+    } else {
+        printf("%-10d %-20s %-19s %s\n", port, service_name_str, conclusion_str, result_str);
+    }
 }
 
 bool is_result_to_print(const t_task *tasks, const uint8_t port_status, const scan_type_t scan_type, const uint16_t i) {
@@ -132,22 +160,13 @@ bool is_result_to_print(const t_task *tasks, const uint8_t port_status, const sc
     else if (port_status & FILTERED_PORTS)
         current_ports = FILTERED_PORTS;
 
-    t_result result = tasks[i].result;
-    if (scan_type == SCAN_TYPE_ALL && result != OPEN) {
-        result = FILTERED;
-        for (uint16_t j = 1; j < SCAN_NUMBER; j++) {
-            if (!is_ignored_state(tasks[i + j].result, tasks[i + j].probe.scan_type)) {
-                result = CLOSED;
-                break;
-            }
-        }
-    }
+    t_result result = tasks[i].result;//add udp nuance?
+    //printf("is_result_to_print: result = %d, current_ports = %d, scan_type = %d\n", result, current_ports, scan_type);
     if (result == OPEN && current_ports == OPEN_PORTS) {
         return true;
-    } else if (result == CLOSED && current_ports == CLOSED_PORTS) {
+    } else if (!is_ignored_state(result, scan_type) && result != OPEN && current_ports == CLOSED_PORTS) {
         return true;
-    } else if (result == FILTERED && current_ports == FILTERED_PORTS) {
-        //return false;
+    } else if (is_ignored_state(result, scan_type) && current_ports == FILTERED_PORTS) {
         return true;
     }
     return false;
@@ -162,7 +181,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
     while (current_task + ports_num <= num_tasks) {
         printf("\n---| IP: %s |---\n", inet_ntoa(tasks[current_task].probe.address.sin_addr));
         uint8_t ports_status = get_ports_status(tasks, current_task, ports_num, config.scan_type);
-        //bool closed_pass = ports_status & CLOSED_PORTS;
+        uint16_t filtered_count = 0;
 
         if (ports_status & OPEN_PORTS)
             print_banner("Open", false);//Change depending on the scan_type
@@ -172,13 +191,10 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
             print_banner("Filtered", false);
         for (uint16_t i = current_task; i < current_task + ports_num; i++)
         {
-            /*if ((tasks[i].result == OPEN && ports_status & OPEN_PORTS) ||
-                (!is_ignored_state(tasks[i].result, tasks[i].probe.scan_type) && ports_status & CLOSED_PORTS) ||
-                (is_ignored_state(tasks[i].result, tasks[i].probe.scan_type) && ports_status & FILTERED_PORTS))
-            {
-                print_result(tasks, i, config.scan_type);
-            }*/
-            if (is_result_to_print(tasks, ports_status, config.scan_type, i)) {
+            if (!DISPLAY_FILTERED && ports_status == FILTERED_PORTS && is_ignored_state(tasks[i].result, tasks[i].probe.scan_type)) {
+                filtered_count++;
+            }
+            else if (is_result_to_print(tasks, ports_status, config.scan_type, i)) {
                 print_result(tasks, i, config.scan_type);
             }
             if (i >= current_task + ports_num - scantype_offset) {
@@ -189,7 +205,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
                 else if (ports_status & FILTERED_PORTS)
                     ports_status -= FILTERED_PORTS;
                 if (ports_status) {
-                    i = current_task;
+                    i = current_task - scantype_offset;
                     if (ports_status & CLOSED_PORTS) {
                         print_banner("Closed/Unfiltered", true);
                     } else if (ports_status & FILTERED_PORTS) {
@@ -200,12 +216,9 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
             if (config.scan_type == SCAN_TYPE_ALL)
                 i += SCAN_NUMBER - 1;
         }
+        if (filtered_count > 0 && !DISPLAY_FILTERED) {
+            printf("<%d ports ignored>\n", filtered_count);
+        }
         current_task += ports_num;
     }
 }
-//We should be able to go above PORTS_MAX in args
-
-/*
-FIRST AND FOREMOST DO THE CONCLUSION_STR
-ADJUST THE LOGIC TO THE 3 STATES OPEN CLOSED FILTERED
-*/
