@@ -221,15 +221,11 @@ tests =
     "RESULT COMPARISON"
     [ testCase "Parse nmap_result3.xml (with extraports)" $ do
         nmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        ftNmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
+        ftNmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
         let scanResultDiff = pruneHappyPaths $ deepAlign nmapResult ftNmapResult
 
-        putStrLn (ppShow scanResultDiff)
-
-        -- Check for missing hosts
-        let extraHostsOnNmap = extraHostsOnA nmapResult ftNmapResult
-        unless (M.null extraHostsOnNmap) $
-          assertFailure ("missing hosts on ft_nmap: " ++ unlines (map show $ M.keys extraHostsOnNmap))
+        unless (M.null scanResultDiff) $
+          assertFailure ("scanResultDiff: " ++  ppShow scanResultDiff)
     ]
 
 main :: IO ()
