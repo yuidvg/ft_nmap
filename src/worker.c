@@ -16,7 +16,7 @@ t_task *build_tasks(const probe_t *probes, const uint16_t num_tasks)
     {
         tasks[i].probe = probes[i];
         tasks[i].status = CREATED;
-        if (probes[i].scan_type == SCAN_TYPE_SYN || probes[i].scan_type == SCAN_TYPE_ACK)
+        if (probes[i].scan_type == SCAN_TYPE_SYN || probes[i].scan_type == SCAN_TYPE_ACK || probes[i].scan_type == SCAN_TYPE_UDP)
             tasks[i].result = FILTERED;
         else
             tasks[i].result = OPEN_FILTERED;
