@@ -1,12 +1,15 @@
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad
+import Data.Align
 import Data.Functor
 import Data.IntMap.Strict qualified as IM
 import Data.Map.Strict qualified as M
+import Data.These
 import System.Directory ()
 import Test.Tasty
 import Test.Tasty.HUnit
+import Text.Show.Pretty
 import Text.XML.HXT.Core
 
 -- Normalized state used by comparisons
@@ -40,6 +43,21 @@ type Ports = IM.IntMap PortInfo
 type Hosts = M.Map HostIP Ports
 
 type ScanResult = Hosts
+
+-- for diff
+data AlignedHost
+  = HostOnlyInA Ports
+  | HostOnlyInB Ports
+  | HostInBoth (IM.IntMap AlignedPort) -- ポートレベルでalignした結果
+  deriving (Show)
+
+data AlignedPort
+  = PortOnlyInA PortInfo
+  | PortOnlyInB PortInfo
+  | PortInBoth PortInfo PortInfo
+  deriving (Show)
+
+type AlignedScanResult = M.Map HostIP AlignedHost
 
 -- ---------------------------------------
 -- PARSER
@@ -92,7 +110,7 @@ nmapXMLStructure =
       getChildren
         >>> isElem
         >>> hasName "ports"
-        >>> (normalPortsA &&& extraPortsA)
+        >>> (normalPortsA &&& (extraPortsA <+> arr (const IM.empty)))
         >>> arr (uncurry IM.union)
 
     normalPortsA :: (ArrowXml a) => a XmlTree Ports
@@ -102,7 +120,9 @@ nmapXMLStructure =
             >>> ( getAttrValue "portid"
                     &&& getAttrValue "protocol"
                     &&& (getChildren >>> isElem >>> hasName "state" >>> getAttrValue "state")
-                    &&& (getChildren >>> isElem >>> hasName "service" >>> getAttrValue "name")
+                    &&& ( (getChildren >>> isElem >>> hasName "service" >>> getAttrValue "name")
+                            <+> arr (const "")
+                        )
                 )
             >>> arr
               ( \(portIdStr, (protocolStr, (stateStr, serviceName))) ->
@@ -148,23 +168,48 @@ parsePortState s
 -- DIFF
 -- ---------------------------------------
 
+-- ScanResultを再帰的にalignして、新しいデータ構造 AlignedScanResult を返す
+deepAlign :: ScanResult -> ScanResult -> AlignedScanResult
+deepAlign resA resB =
+  let alignedHosts = align resA resB
+   in M.map processHost alignedHosts
+  where
+    processHost :: These Ports Ports -> AlignedHost
+    processHost (This portsA) = HostOnlyInA portsA
+    processHost (That portsB) = HostOnlyInB portsB
+    processHost (These portsA portsB) =
+      let alignedPorts = align portsA portsB
+       in HostInBoth $ IM.map processPort alignedPorts
+      where
+        processPort :: These PortInfo PortInfo -> AlignedPort
+        processPort (This portA) = PortOnlyInA portA
+        processPort (That portB) = PortOnlyInB portB
+        processPort (These portA portB) = PortInBoth portA portB
+
 extraHostsOnA :: Hosts -> Hosts -> Hosts
 extraHostsOnA = M.difference
 
 extraPortsOnA :: Ports -> Ports -> Ports
 extraPortsOnA = IM.difference
 
-diffsOnPortsPair :: Ports -> Ports -> IM.IntMap (PortInfo, PortInfo)
-diffsOnPortsPair portsA portsB =
-  IM.mapMaybeWithKey
-    ( \portId portInfoA ->
-        case IM.lookup portId portsB of
-          Just portInfoB | portInfoA.state /= portInfoB.state -> Just (portInfoA, portInfoB)
-          _ -> Nothing
-    )
-    portsA
 
+pruneHappyPaths :: AlignedScanResult -> AlignedScanResult
+pruneHappyPaths = M.mapMaybe pruneHost
+  where
+    pruneHost :: AlignedHost -> Maybe AlignedHost
+    pruneHost (HostInBoth alignedPorts) =
+      let -- ポートレベルで差分がないものをフィルタリング
+          portDiffs = IM.filter (not . isBothSame) alignedPorts
+      in if IM.null portDiffs
+           then Nothing -- ポート差分がなければホストごと消す
+           else Just (HostInBoth portDiffs)
+    -- Aのみ、Bのみのホストは差分なのでそのまま残す
+    pruneHost diff = Just diff
 
+    -- PortInfoのstateが同じBothはハッピーパス
+    isBothSame :: AlignedPort -> Bool
+    isBothSame (PortInBoth a b) = a.state == b.state
+    isBothSame _          = False -- This, Thatは差分
 
 -- ---------------------------------------
 -- TESTS
@@ -173,12 +218,18 @@ diffsOnPortsPair portsA portsB =
 tests :: TestTree
 tests =
   testGroup
-    "ft_nmap e2e parser"
-    [ testCase "nmap -oX ./test/e2e/nmap_result2.xml -sS -sU 1.1.1.1 google.com vs nmap -sS -oX &quot;nmap_result sudo nmap 1.1.1.1 google.com -sS -oX&quot; 1.1.1.1 google.com" $ do
-        nmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result2.xml"
+    "RESULT COMPARISON"
+    [ testCase "Parse nmap_result3.xml (with extraports)" $ do
+        nmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
         ftNmapResult <- parseNmapResultFromFile "./test/e2e/nmap_result.xml"
-        let extraHosts = extraHostsOnA nmapResult ftNmapResult
-        unless (M.null extraHosts) $ assertFailure ("missing hosts: " ++ unlines (map show $ M.keys extraHosts))
+        let scanResultDiff = pruneHappyPaths $ deepAlign nmapResult ftNmapResult
+
+        putStrLn (ppShow scanResultDiff)
+
+        -- Check for missing hosts
+        let extraHostsOnNmap = extraHostsOnA nmapResult ftNmapResult
+        unless (M.null extraHostsOnNmap) $
+          assertFailure ("missing hosts on ft_nmap: " ++ unlines (map show $ M.keys extraHostsOnNmap))
     ]
 
 main :: IO ()

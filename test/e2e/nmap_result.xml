@@ -21,7 +21,7 @@
 		<status state="up" reason="unknown-response" reason_ttl="0" />
 		<address addr="1.1.1.1" addrtype="ipv4" />
 		<hostnames>
-</hostnames>
+		</hostnames>
 	</hosthint>
 	<host starttime="1755011332" endtime="1755011339">
 		<status state="up" reason="syn-ack" reason_ttl="55" />
