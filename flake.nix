@@ -1,5 +1,6 @@
 {
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixos-vscode-server = {
       url = "github:nix-community/nixos-vscode-server";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -33,6 +34,18 @@
           nil
           nixfmt-rfc-style
           bear
+          #haskell
+          ghc
+          cabal-install
+          haskell-language-server
+          hlint
+          cabal-install
+          ormolu
+          haskellPackages.cabal-gild
+          haskellPackages.ghci-dap
+          haskellPackages.haskell-debug-adapter
+          haskellPackages.haskell-dap
+          haskellPackages.implicit-hie
         ];
 
       vmPackagesFor =
@@ -184,10 +197,15 @@
       packages = builtins.listToAttrs (
         map (host: {
           name = host;
-          value = rec {
-            vm = self.nixosConfigurations.${host}.config.system.build.vm;
-            default = vm;
-          };
+          value =
+            let
+              pkgsFor = import nixpkgs { system = host; };
+            in
+            rec {
+              vm = self.nixosConfigurations.${host}.config.system.build.vm;
+              e2e = pkgsFor.haskellPackages.callCabal2nix "e2e" (self + "/test/e2e") { };
+              default = vm;
+            };
         }) hostSystems
       );
       # Development shell

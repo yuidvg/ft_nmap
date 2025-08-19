@@ -31,6 +31,26 @@
             ]
         },
         {
+			"type": "ghc",
+			"request": "launch",
+			"name": "haskell-debug-adapter",
+			"internalConsoleOptions": "openOnSessionStart",
+			"workspace": "${workspaceFolder}",
+			"startup": "${workspaceFolder}/test/e2e/Main.hs",
+			"startupFunc": "",
+			"startupArgs": "",
+			"stopOnEntry": true,
+			"mainArgs": "",
+			"ghciPrompt": "H>>= ",
+			"ghciInitialPrompt": "ghci> ",
+			// The special key "ghci-dap" instructs HDA to use hie-bios to determine the appropriate flags to pass
+			"ghciCmd": "ghci-dap",
+			"ghciEnv": {},
+			"logFile": "${workspaceFolder}/.vscode/phoityne.log",
+			"logLevel": "WARNING",
+			"forceInspect": false
+		},
+        {
             "name": "(lldb) Launch",
             "type": "cppdbg",
             "request": "launch",

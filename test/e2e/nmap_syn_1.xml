@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///nix/store/h89r483s3xwnndbim0zg2i2jzlm700l8-nmap-7.97/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.97 scan initiated Mon Aug 18 18:44:16 2025 as: nmap -oX ./test/e2e/nmap_syn_1.1.1.1_p10-30.xml -sS -Pn -p 10-30 1.1.1.1 -->
+<nmaprun scanner="nmap" args="nmap -oX ./test/e2e/nmap_syn_1.1.1.1_p10-30.xml -sS -Pn -p 10-30 1.1.1.1" start="1755535456" startstr="Mon Aug 18 18:44:16 2025" version="7.97" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="21" services="10-30"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1755535456" endtime="1755535457"><status state="up" reason="user-set" reason_ttl="0"/>
+<address addr="1.1.1.1" addrtype="ipv4"/>
+<hostnames>
+<hostname name="one.one.one.one" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="10"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+<port protocol="tcp" portid="11"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="systat" method="table" conf="3"/></port>
+<port protocol="tcp" portid="12"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+<port protocol="tcp" portid="13"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="daytime" method="table" conf="3"/></port>
+<port protocol="tcp" portid="14"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+<port protocol="tcp" portid="15"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="netstat" method="table" conf="3"/></port>
+<port protocol="tcp" portid="16"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+<port protocol="tcp" portid="17"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="qotd" method="table" conf="3"/></port>
+<port protocol="tcp" portid="18"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="msp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="19"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="chargen" method="table" conf="3"/></port>
+<port protocol="tcp" portid="20"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="ftp-data" method="table" conf="3"/></port>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="22"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="23"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="telnet" method="table" conf="3"/></port>
+<port protocol="tcp" portid="24"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="priv-mail" method="table" conf="3"/></port>
+<port protocol="tcp" portid="25"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="smtp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="26"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="rsftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="27"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="nsw-fe" method="table" conf="3"/></port>
+<port protocol="tcp" portid="28"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+<port protocol="tcp" portid="29"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="msg-icp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="30"><state state="filtered" reason="no-response" reason_ttl="0"/></port>
+</ports>
+<times srtt="5811" rttvar="5400" to="100000"/>
+</host>
+<runstats><finished time="1755535457" timestr="Mon Aug 18 18:44:17 2025" summary="Nmap done at Mon Aug 18 18:44:17 2025; 1 IP address (1 host up) scanned in 1.47 seconds" elapsed="1.47" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>
