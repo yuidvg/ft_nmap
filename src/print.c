@@ -78,7 +78,7 @@ char *result2str(const t_result result)
 bool is_ignored_state(t_result result, const scan_type_t scan_type) {
     switch (scan_type) {
         case SCAN_TYPE_SYN:
-            return result == CLOSED || result == FILTERED;
+            return result == FILTERED;
         case SCAN_TYPE_ACK:
             return result == FILTERED;
         case SCAN_TYPE_NULL:
@@ -180,6 +180,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
 
     while (current_task + ports_num <= num_tasks) {
         printf("\n---| IP: %s |---\n", inet_ntoa(tasks[current_task].probe.address.sin_addr));
+        printf("ports_num = %d, current_task = %d\n", ports_num, current_task);
         uint8_t ports_status = get_ports_status(tasks, current_task, ports_num, config.scan_type);
         uint16_t filtered_count = 0;
 
@@ -189,7 +190,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
             print_banner("Closed/Unfiltered", false);
         else
             print_banner("Filtered", false);
-        for (uint16_t i = current_task; i < current_task + ports_num; i++)
+        for (uint16_t i = current_task; i < current_task + ports_num; i += scantype_offset)
         {
             if (!DISPLAY_FILTERED && ports_status == FILTERED_PORTS && is_ignored_state(tasks[i].result, tasks[i].probe.scan_type)) {
                 filtered_count++;
@@ -213,8 +214,6 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
                     }
                 }
             }
-            if (config.scan_type == SCAN_TYPE_ALL)
-                i += SCAN_NUMBER - 1;
         }
         if (filtered_count > 0 && !DISPLAY_FILTERED) {
             printf("<%d ports ignored>\n", filtered_count);
