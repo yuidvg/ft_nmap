@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
     // SENDING (AND RECEIVING) THE PACKETS
 
-    pthread_t *threads = malloc((config.number_of_threads) * (sizeof(pthread_t)));
+    pthread_t *threads = safe_malloc_or_exit((config.number_of_threads) * (sizeof(pthread_t)));
     if (!threads)
     {
         printf("Failed to allocate memory for threads\n");

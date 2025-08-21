@@ -4,9 +4,6 @@
 #include "macro.h"
 #include "type.h"
 
-
-
-
 // error
 void safely_exit(const int code);
 void print_error_and_exit(const char *const message);
@@ -20,7 +17,7 @@ size_t count_probes(const probe_t *const probes);
 
 // memory
 void *safe_malloc_or_exit(const size_t size);
-void memory_manager_cleanup(void);
+void register_memory_block_or_exit(void *const ptr);
 
 // print
 char *scan_type2str(const scan_type_t scan_type);
@@ -48,3 +45,4 @@ probe_t*build_probes(const uint16_t num_probes);
 
 // wrapper
 char **ft_split_or_exit(char const *s, char c);
+char *strdup_or_exit(char const *s);

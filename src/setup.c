@@ -61,4 +61,5 @@ void setup_filter(pcap_t *handle, char *local_ip) {
         pcap_close(handle);
         exit(EXIT_FAILURE);
     }
+    pcap_freecode(&fp);
 }

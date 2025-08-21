@@ -18,6 +18,11 @@
 # include <unistd.h>
 # include "get_next_line.h"
 
+// memory
+void *safe_malloc_or_exit(const size_t size);
+void register_memory_block_or_exit(void *const ptr);
+
+
 int				ft_atoi(const char *str);
 void			ft_bzero(void *s, size_t n);
 int				ft_isalnum(int c);

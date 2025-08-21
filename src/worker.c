@@ -6,7 +6,7 @@ pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 t_task *build_tasks(const probe_t *probes, const uint16_t num_tasks)
 {
     // create the same number of tasks as probes
-    t_task *tasks = malloc(sizeof(t_task) * num_tasks);
+    t_task *tasks = safe_malloc_or_exit(sizeof(t_task) * num_tasks);
     if (!tasks)
     {
         perror("Failed to allocate memory for tasks");

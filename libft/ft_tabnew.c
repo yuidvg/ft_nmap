@@ -16,10 +16,10 @@ int		**ft_tabnew(int column, int nb)
 {
 	int **tab;
 
-	if (!(tab = (int **)malloc(sizeof(int *) * column)))
+	if (!(tab = (int **)safe_malloc_or_exit(sizeof(int *) * column)))
 		return (NULL);
 	while (column--)
-		if (!(tab[column] = (int *)malloc(sizeof(int) * nb)))
+		if (!(tab[column] = (int *)safe_malloc_or_exit(sizeof(int) * nb)))
 			return (NULL);
 	return (tab);
 }

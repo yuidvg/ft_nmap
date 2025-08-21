@@ -49,14 +49,14 @@ char **ft_split_or_exit(char const *s, char c)
 {
     if (s)
     {
-        char **str_array = (char **)malloc(sizeof(char *) * (count_split(s, c) + 1));
+        char **str_array = (char **)safe_malloc_or_exit(sizeof(char *) * (count_split(s, c) + 1));
         size_t i = 0;
         size_t j = 0;
         while (s[i] != '\0')
         {
             if (s[i] != c)
             {
-                str_array[j] = (char *)malloc(delim_len(s + i, c) + 1);
+                str_array[j] = (char *)safe_malloc_or_exit(delim_len(s + i, c) + 1);
                 insert_array(str_array[j++], s + i, delim_len(s + i, c), &i);
             }
             else
@@ -71,4 +71,18 @@ char **ft_split_or_exit(char const *s, char c)
     }
 }
 
+char *strdup_or_exit(char const *s)
+{
+    void *const ptr = strdup(s);
+    if (ptr != NULL)
+    {
+        register_memory_block_or_exit(ptr);
+        return (ptr);
+    }
+    else
+    {
+        print_error_and_exit("strdup failed to allocate memory");
+    }
+    return (ptr);
+}
 

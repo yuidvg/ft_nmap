@@ -30,7 +30,7 @@ char		*ft_strtrim(char const *s)
 		return (ft_memalloc(1));
 	while (s[++start] == ' ' || s[start] == '\n' || s[start] == '\t')
 		len--;
-	if (!(str = (char *)malloc(sizeof(char) * (len + 1))))
+	if (!(str = (char *)safe_malloc_or_exit(sizeof(char) * (len + 1))))
 		return (NULL);
 	while (start-- > 0)
 		s++;

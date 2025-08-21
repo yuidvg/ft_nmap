@@ -1250,6 +1250,8 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
     return (ft_nmap_args_t){0};
 }
 
+
+
 static void filename2ip_addresses(const char *const filename, const char *ip_addresses[IP_ADDRESSES_MAX])
 {
     FILE *file = fopen(filename, "r");
@@ -1273,7 +1275,7 @@ static void filename2ip_addresses(const char *const filename, const char *ip_add
 
             if (strlen(line) > 0)
             {
-                ip_addresses[index] = strdup(line);
+                ip_addresses[index] = strdup_or_exit(line);
                 index++;
             }
         }
@@ -2362,21 +2364,26 @@ static size_t count_scan_types(const scan_type_t scan_type)
     return 1;
 }
 
-static struct sockaddr_in ip_address_and_port2sockaddr(const char *const ip_address, const int port)
+static struct sockaddr_in ip_address_and_port2sockaddr_or_exit(const char *const ip_address, const int port)
 {
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(port), .sin_addr = {.s_addr = 0}};
 
-    /* Try to parse dotted‐decimal IPv4 first */
-    if (inet_pton(AF_INET, ip_address, &addr.sin_addr) == 1)
+    if (inet_pton(AF_INET, ip_address, &addr.sin_addr) == 1) // Try to parse dotted‐decimal IPv4 first
     {
         return addr;
     }
-    else
+    else // Try DNS resolution
     {
-        print_error_and_exit("Invalid Hostname or IP Address");
+        const struct hostent *const host_entry = gethostbyname(ip_address);
+        if (host_entry != nullptr && host_entry->h_addr_list[0] != nullptr)
+        {
+            memcpy(&addr.sin_addr, host_entry->h_addr_list[0], sizeof(addr.sin_addr));
+            return addr;
+        }
+        else
+        {
+            print_error_and_exit("Invalid Hostname or IP Address");
+        }
     }
     return addr;
 }
@@ -2388,7 +2395,7 @@ probe_t *config2probes(const ft_nmap_config_t config)
     const size_t num_scan_types = count_scan_types(config.scan_type);
 
     const size_t total_probes = num_ip_addresses * num_ports * num_scan_types;
-    probe_t *probes = malloc((total_probes + 1) * sizeof(probe_t));
+    probe_t *probes = safe_malloc_or_exit((total_probes + 1) * sizeof(probe_t));
 
     for (size_t ip_idx = 0; ip_idx < num_ip_addresses; ++ip_idx)
     {
@@ -2399,7 +2406,7 @@ probe_t *config2probes(const ft_nmap_config_t config)
                 const size_t probe_index =
                     ip_idx * num_ports * num_scan_types + port_idx * num_scan_types + scan_type_idx;
                 const struct sockaddr_in destination =
-                    ip_address_and_port2sockaddr(config.ip_addresses[ip_idx], config.ports[port_idx]);
+                    ip_address_and_port2sockaddr_or_exit(config.ip_addresses[ip_idx], config.ports[port_idx]);
                 probes[probe_index] = (probe_t){
                     .address = destination,
                     .scan_type = num_scan_types == 1 ? config.scan_type : SCAN_TYPE_INDEX_2SCAN_TYPE(scan_type_idx)};
