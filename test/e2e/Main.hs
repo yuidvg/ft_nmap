@@ -2,17 +2,24 @@ module Main where
 
 import Control.Monad
 import Data.Align
+import Data.Char (isDigit)
 import Data.Functor
-import System.FilePath
 import Data.IntMap.Strict qualified as IM
+import Data.List.NonEmpty qualified as NE
+import Data.List.Split
 import Data.Map.Strict qualified as M
+import Data.Maybe
 import Data.These
+import System.FilePath
 import System.IO.Temp
 import System.Process
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Show.Pretty
 import Text.XML.HXT.Core
+
+-- aliases
+type NonEmptyString = NE.NonEmpty Char
 
 -- Normalized state used by comparisons
 data PortState = StateOpen | StateClosed | StateFiltered | StateUnknown | StateOpenFiltered | StateClosedFiltered
@@ -76,24 +83,16 @@ parseProtocol s
   | s == "udp" = UDP
   | otherwise = TCP
 
--- Simple splitOn for single-character delimiters
-splitOn :: Char -> String -> [String]
-splitOn _ "" = [""]
-splitOn delim s =
-  let (chunk, rest) = break (== delim) s
-   in case rest of
-        [] -> [chunk]
-        (_ : r) -> chunk : splitOn delim r
-
 portRangeStr2Ports :: String -> [Int]
 portRangeStr2Ports s =
-  case splitOn '-' s of
+  case splitOn "-" s of
     [start, end] -> [read start .. read end]
+    [port] -> [read port]
     _ -> []
 
 portRangesStr2Ports :: String -> [Int]
 portRangesStr2Ports s =
-  concatMap portRangeStr2Ports (splitOn ',' s)
+  concatMap portRangeStr2Ports (splitOn "," s)
 
 nmapXMLStructure :: (ArrowXml a) => a XmlTree ScanResult
 nmapXMLStructure =
@@ -112,7 +111,7 @@ nmapXMLStructure =
       getChildren
         >>> isElem
         >>> hasName "ports"
-        >>> (normalPortsA &&& (extraPortsA <+> arr (const IM.empty)))
+        >>> (normalPortsA &&& extraPortsA)
         >>> arr (uncurry IM.union)
 
     normalPortsA :: (ArrowXml a) => a XmlTree Ports
@@ -137,16 +136,19 @@ nmapXMLStructure =
 
     extraPortsA :: (ArrowXml a) => a XmlTree Ports
     extraPortsA =
-      deep (isElem >>> hasName "extraports")
-        >>> ( getAttrValue "state"
-                &&& (getChildren >>> isElem >>> hasName "extrareasons" >>> (getAttrValue "ports" &&& getAttrValue "proto"))
-            )
-        >>> arr
-          ( \(stateStr, (portsStr, protoStr)) ->
-              let state = parsePortState stateStr
-                  ports = portRangesStr2Ports portsStr
-               in IM.fromList $ map (,PortInfo (parseProtocol protoStr) state "") ports
-          )
+      listA
+        ( deep (isElem >>> hasName "extraports")
+            >>> ( getAttrValue "state"
+                    &&& (getChildren >>> isElem >>> hasName "extrareasons" >>> (getAttrValue "ports" &&& getAttrValue "proto"))
+                )
+            >>> arr
+              ( \(stateStr, (portsStr, protoStr)) ->
+                  let state = parsePortState stateStr
+                      ports = portRangesStr2Ports portsStr
+                   in IM.fromList $ Prelude.map (,PortInfo (parseProtocol protoStr) state "") ports
+              )
+        )
+        >>> arr (foldr IM.union IM.empty)
 
 -- IO boundary: parse from XML string and convert to nested Map
 parseNmapResultFromFile :: FilePath -> IO ScanResult
@@ -156,6 +158,57 @@ parseNmapResultFromFile xmlPath =
   where
     opts = [withValidate no, withSubstDTDEntities no, withRemoveWS yes]
     mergeHostMaps = M.unionsWith IM.union
+
+-- 新しいトップレベルのパーサー関数
+parseFtNmapResult :: String -> ScanResult
+parseFtNmapResult input =
+  let sections = splitByIPSection input
+      parsedSections = Prelude.map parseIPSection sections
+   in M.fromList parsedSections
+
+splitByIPSection :: String -> [NonEmptyString]
+splitByIPSection whole =
+  let sections :: [String] = drop 1 $ splitOn "---| IP:" whole
+   in mapMaybe NE.nonEmpty sections
+
+nonEmptyLines :: NonEmptyString -> NE.NonEmpty String
+nonEmptyLines = fromJust . NE.nonEmpty . lines . NE.toList
+
+parseIPSection :: NonEmptyString -> (HostIP, Ports)
+parseIPSection section =
+  let (ipLine NE.:| restLines) = nonEmptyLines section
+      portLines =
+        Prelude.filter
+          ( \case
+              (c : _) -> isDigit c
+              [] -> False
+          )
+          restLines
+      ports = IM.fromList $ Prelude.map parsePortLine portLines
+      ip = parseIPLine ipLine
+   in (ip, ports)
+
+parsePortLine :: String -> (Int, PortInfo)
+parsePortLine line =
+  case splitOn " " line of
+    [portNum, protoStr, stateStr, serviceName] ->
+      (parseInt portNum, PortInfo (parseProtocol protoStr) (parsePortState stateStr) serviceName)
+    _ -> (-1, PortInfo TCP StateUnknown "")
+
+parseIPLine :: String -> HostIP
+parseIPLine ipLine =
+  let parts = splitOn " " ipLine
+      _ = print ("ipLine: " ++ show ipLine)
+      _ = print ("parts: " ++ show parts)
+      ipPart = case drop 1 parts of
+        (ip : _) -> ip
+        [] -> ""
+   in ipPart
+
+parseFtNmapResultFromFile :: FilePath -> IO ScanResult
+parseFtNmapResultFromFile outputPath = do
+  outputRaw <- readFile outputPath
+  return $ parseFtNmapResult outputRaw
 
 parsePortState :: String -> PortState
 parsePortState s
@@ -170,7 +223,6 @@ parsePortState s
 -- DIFF
 -- ---------------------------------------
 
--- ScanResultを再帰的にalignして、新しいデータ構造 AlignedScanResult を返す
 deepAlign :: ScanResult -> ScanResult -> AlignedScanResult
 deepAlign resA resB =
   let alignedHosts = align resA resB
@@ -188,36 +240,28 @@ deepAlign resA resB =
         processPort (That portB) = PortOnlyInB portB
         processPort (These portA portB) = PortInBoth portA portB
 
-extraHostsOnA :: Hosts -> Hosts -> Hosts
-extraHostsOnA = M.difference
-
-extraPortsOnA :: Ports -> Ports -> Ports
-extraPortsOnA = IM.difference
-
 pruneHappyPaths :: AlignedScanResult -> AlignedScanResult
 pruneHappyPaths = M.mapMaybe pruneHost
   where
     pruneHost :: AlignedHost -> Maybe AlignedHost
     pruneHost (HostInBoth alignedPorts) =
-      let -- ポートレベルで差分がないものをフィルタリング
-          portDiffs = IM.filter (not . isBothSame) alignedPorts
+      let portDiffs = IM.filter (not . isBothSame) alignedPorts
        in if IM.null portDiffs
-            then Nothing -- ポート差分がなければホストごと消す
+            then Nothing
             else Just (HostInBoth portDiffs)
-    -- Aのみ、Bのみのホストは差分なのでそのまま残す
     pruneHost diff = Just diff
 
-    -- PortInfoのstateが同じBothはハッピーパス
     isBothSame :: AlignedPort -> Bool
     isBothSame (PortInBoth a b) = a.state == b.state
-    isBothSame _ = False -- This, Thatは差分
+    isBothSame _ = False
 
 -- ---------------------------------------
 -- TESTS
 -- ---------------------------------------
 
 data TestCase = TestCase
-  { nmapArgs :: [String],
+  { testName :: String,
+    nmapArgs :: [String],
     ftNmapArgs :: [String]
   }
   deriving (Show)
@@ -225,31 +269,52 @@ data TestCase = TestCase
 testcases :: [TestCase]
 testcases =
   [ TestCase
-      { ftNmapArgs = ["-sS", "1.1.1.1", "-p", "22,80"],
-        nmapArgs = ["-sS", "1.1.1.1", "-p", "22,80,30"]
+      { testName = "SYN with large port range",
+        nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-600"]
       },
     TestCase
-      { ftNmapArgs = ["-sU", "google.com", "-p", "53"],
-        nmapArgs = ["-sU", "google.com", "-p", "53"]
+      { testName = "UDP with large port range",
+        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-600"]
+      },
+    TestCase
+      { testName = "ACK with large port range",
+        nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "1-600"]
+      },
+    TestCase
+      { testName = "XMAS with large port range",
+        nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "1-600"]
+      },
+    TestCase
+      { testName = "FIN with large port range",
+        nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "1-600"]
+      },
+    TestCase
+      { testName = "NULL with large port range",
+        nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "1-600"],
+        ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "1-600"]
       }
       -- ... add Test Cases Here
   ]
 
 conductTest :: TestCase -> Assertion
 conductTest testCase' =
- withSystemTempDirectory "nmap-e2e-test-" $ \tempDir -> do
-    -- 作成したディレクトリの中に、出力先のファイルパスを構築する
+  withSystemTempDirectory "nmap-e2e-test-" $ \tempDir -> do
     let nmapResultPath = tempDir </> "nmap_result.xml"
-        ftNmapResultPath = tempDir </> "ft_nmap_result.xml"
 
-    -- nmapとft_nmapをそれぞれ実行し、専用のファイルに書き込ませる
-    -- 注意：元のコードでは両方とも "nmap" になっていたので修正
-    callProcess "nmap"    (testCase'.nmapArgs    ++ ["-oX", nmapResultPath])
-    callProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["-oX", ftNmapResultPath])
+    callProcess "nmap" (testCase'.nmapArgs ++ ["-oX", nmapResultPath])
+    ftNmapOutput <- readProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["--speedup", "250"]) ""
 
-    -- 以降の処理は変更なし
     nmapResult <- parseNmapResultFromFile nmapResultPath
-    ftNmapResult <- parseNmapResultFromFile ftNmapResultPath
+    let ftNmapResult = parseFtNmapResult ftNmapOutput
+
+    -- debug
+    -- putStrLn $ "nmapResult: " ++ ppShow nmapResult
+    -- putStrLn $ "ftNmapResult: " ++ ppShow ftNmapResult
 
     let scanResultDiff = pruneHappyPaths $ deepAlign nmapResult ftNmapResult
 
@@ -260,7 +325,7 @@ tests :: TestTree
 tests =
   testGroup
     "RESULT COMPARISON"
-    (map (\tc -> testCase (show tc) (conductTest tc)) testcases)
+    (Prelude.map (\tc -> testCase tc.testName (conductTest tc)) testcases)
 
 main :: IO ()
 main = defaultMain tests

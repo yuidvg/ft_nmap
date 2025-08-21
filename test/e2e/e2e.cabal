@@ -12,6 +12,7 @@ executable e2e
     NoFieldSelectors
     OverloadedRecordDot
     OverloadedStrings
+    LambdaCase
 
   ghc-options:
     -Wall
@@ -25,10 +26,15 @@ executable e2e
     directory,
     filepath,
     hxt,
+    megaparsec,
     pretty-show,
     process,
+    regex-tdfa,
     semialign,
+    split,
     tasty,
     tasty-hunit,
     temporary,
+    text,
     these,
+
