@@ -126,40 +126,12 @@ e2e: app
 	nix run .#e2e
 
 #-----------------------------------------------------------------------------------------------------------#
-# HOOK
-#-----------------------------------------------------------------------------------------------------------#
-# Config
-# Hook malloc
-HOOK_DIR = hook
-HOOK_SRC = $(wildcard $(HOOK_DIR)/*.c)
-HOOK_OBJ_DIR = $(OBJ_DIR)/hook
-HOOK_OBJ = $(patsubst $(HOOK_DIR)/%.c,$(HOOK_OBJ_DIR)/%.o,$(HOOK_SRC))
-
-# Hook shared library
-ifeq ($(shell uname -s),Darwin)
-# HOOK_LIB = $(BIN_DIR)/libhook.dylib
-# HOOK_LDFLAGS = -dynamiclib -fPIC \
-#                -current_version 1.0 -compatibility_version 1.0 \
-#                -undefined dynamic_lookup
-else
-HOOK_LIB = $(BIN_DIR)/libhook.so
-HOOK_LDFLAGS = -shared -fPIC
-endif
-# Hook library
-# Link
-$(HOOK_LIB): $(HOOK_OBJ)
-	$(CC) $(HOOK_LDFLAGS) -o $@ $(HOOK_OBJ)
-# Compile
-$(HOOK_OBJ): $(HOOK_OBJ_DIR)/%.o: $(HOOK_DIR)/%.c
-	$(CC) $(CFLAGS_RELEASE) -c $< -o $@
-
-#-----------------------------------------------------------------------------------------------------------#
 # ALL
 #-----------------------------------------------------------------------------------------------------------#
 # Config
 ALL_INCLUDE = $(APP_INCLUDE)
-ALL_BIN = $(APP_BIN) $(APP_DEBUG_BIN) $(DEBUG_BIN) $(TEST_BIN) $(HOOK_LIB)
-ALL_OBJ = $(APP_OBJ) $(APP_DEBUG_OBJ) $(DEBUG_OBJ) $(TEST_OBJ) $(HOOK_OBJ)
+ALL_BIN = $(APP_BIN) $(APP_DEBUG_BIN) $(DEBUG_BIN) $(TEST_BIN)
+ALL_OBJ = $(APP_OBJ) $(APP_DEBUG_OBJ) $(DEBUG_OBJ) $(TEST_OBJ)
 # Rule
 all: $(ALL_BIN)
 
