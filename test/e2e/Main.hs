@@ -10,13 +10,12 @@ import Data.List.Split
 import Data.Map.Strict qualified as M
 import Data.Maybe
 import Data.These
-import System.FilePath
-import System.IO.Temp
 import System.Process
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Show.Pretty
 import Text.XML.HXT.Core
+import Data.List qualified as L
 
 -- aliases
 type NonEmptyString = NE.NonEmpty Char
@@ -55,8 +54,8 @@ type ScanResult = Hosts
 
 -- for diff
 data AlignedHost
-  = HostOnlyInA Ports
-  | HostOnlyInB Ports
+  = HostOnlyInNmap Ports
+  | HostOnlyInFtNmap Ports
   | HostInBoth (IM.IntMap AlignedPort) -- ポートレベルでalignした結果
   deriving (Show)
 
@@ -151,10 +150,8 @@ nmapXMLStructure =
         >>> arr (foldr IM.union IM.empty)
 
 -- IO boundary: parse from XML string and convert to nested Map
-parseNmapResultFromFile :: FilePath -> IO ScanResult
-parseNmapResultFromFile xmlPath =
-  readFile xmlPath >>= \xmlRaw ->
-    runX (readString opts xmlRaw >>> nmapXMLStructure) Data.Functor.<&> mergeHostMaps
+parseNmapResult :: String -> IO ScanResult
+parseNmapResult xmlRaw = runX (readString opts xmlRaw >>> nmapXMLStructure) Data.Functor.<&> mergeHostMaps
   where
     opts = [withValidate no, withSubstDTDEntities no, withRemoveWS yes]
     mergeHostMaps = M.unionsWith IM.union
@@ -229,8 +226,8 @@ deepAlign resA resB =
    in M.map processHost alignedHosts
   where
     processHost :: These Ports Ports -> AlignedHost
-    processHost (This portsA) = HostOnlyInA portsA
-    processHost (That portsB) = HostOnlyInB portsB
+    processHost (This portsA) = HostOnlyInNmap portsA
+    processHost (That portsB) = HostOnlyInFtNmap portsB
     processHost (These portsA portsB) =
       let alignedPorts = align portsA portsB
        in HostInBoth $ IM.map processPort alignedPorts
@@ -267,49 +264,155 @@ data TestCase = TestCase
   deriving (Show)
 
 testcases :: [TestCase]
-testcases =
-  [ TestCase
-      { testName = "SYN with large port range",
-        nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-600"]
-      },
+testcases = [
+  --  TestCase
+  --     { testName = "SYN with large port range",
+  --       nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "UDP with large port range",
+  --       nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "ACK with large port range",
+  --       nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "XMAS with large port range",
+  --       nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "FIN with large port range",
+  --       nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "NULL with large port range",
+  --       nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "1-1024"]
+  --     },
+  --   TestCase
+  --     { testName = "SYN with domain name",
+  --       nmapArgs = ["-sS", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "SYN", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
+  --   TestCase
+  --     { testName = "UDP with domain name",
+  --       nmapArgs = ["-sU", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "UDP", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
+  --   TestCase
+  --     { testName = "ACK with domain name",
+  --       nmapArgs = ["-sA", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "ACK", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
+  --   TestCase
+  --     { testName = "XMAS with domain name",
+  --       nmapArgs = ["-sX", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "XMAS", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
+  --   TestCase
+  --     { testName = "FIN with domain name",
+  --       nmapArgs = ["-sF", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "FIN", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
+  --   TestCase
+  --     { testName = "NULL with domain name",
+  --       nmapArgs = ["-sN", "-Pn", "google.com", "-p", "1-1024"],
+  --       ftNmapArgs = ["--scan", "NULL", "--ip", "google.com", "--port", "1-1024"]
+  --     }
+  --     ,
     TestCase
-      { testName = "UDP with large port range",
-        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-600"]
-      },
+      { testName = "SYN with high port range",
+        nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
     TestCase
-      { testName = "ACK with large port range",
-        nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "1-600"]
-      },
+      { testName = "UDP with high port range",
+        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
     TestCase
-      { testName = "XMAS with large port range",
-        nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "1-600"]
-      },
+      { testName = "ACK with high port range",
+        nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
     TestCase
-      { testName = "FIN with large port range",
-        nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "1-600"]
-      },
+      { testName = "XMAS with high port range",
+        nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
     TestCase
-      { testName = "NULL with large port range",
-        nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "1-600"]
+      { testName = "FIN with high port range",
+        nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "NULL with high port range",
+        nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "SYN with scanme",
+        nmapArgs = ["-sS", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "SYN", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "UDP with scanme",
+        nmapArgs = ["-sU", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "UDP", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "ACK with scanme",
+        nmapArgs = ["-sA", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "ACK", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "XMAS with scanme",
+        nmapArgs = ["-sX", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "XMAS", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "FIN with scanme",
+        nmapArgs = ["-sF", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "FIN", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+      }
+      ,
+    TestCase
+      { testName = "NULL with scanme",
+        nmapArgs = ["-sN", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
+        ftNmapArgs = ["--scan", "NULL", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
       }
       -- ... add Test Cases Here
   ]
 
 conductTest :: TestCase -> Assertion
 conductTest testCase' =
-  withSystemTempDirectory "nmap-e2e-test-" $ \tempDir -> do
-    let nmapResultPath = tempDir </> "nmap_result.xml"
-
-    callProcess "nmap" (testCase'.nmapArgs ++ ["-oX", nmapResultPath])
+  do
+    nmapOutputRaw <- readProcess "nmap" (testCase'.nmapArgs ++ ["-oX", "/dev/stdout", "--noninteractive"]) ""
+    let nmapOutput = trimToXML nmapOutputRaw
     ftNmapOutput <- readProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["--speedup", "250"]) ""
-
-    nmapResult <- parseNmapResultFromFile nmapResultPath
+    -- putStrLn $ "nmapOutput: " ++ nmapOutput  -- debug snippet
+    nmapResult <- parseNmapResult nmapOutput
     let ftNmapResult = parseFtNmapResult ftNmapOutput
 
     -- debug
@@ -329,3 +432,11 @@ tests =
 
 main :: IO ()
 main = defaultMain tests
+
+-- | 前置き／後置きの行を落として純粋な XML だけ残す
+trimToXML :: String -> String
+trimToXML =
+  unlines               -- 行リスト → 文字列
+  . takeWhile (not . L.isPrefixOf "Nmap done")
+  . lines               -- 文字列 → 行リスト
+  . dropWhile (/= '<')  -- prolog ('<') までスキップ
