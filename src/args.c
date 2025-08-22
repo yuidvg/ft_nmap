@@ -49,7 +49,7 @@ static void parse_ports(const char *const port_str, int ports_out[PORTS_MAX])
                     for (int port = start_port; port <= end_port && port_index < PORTS_MAX; ++port)
                     {
                         ports_out[port_index++] = port;
-                        if (port_index >= PORTS_MAX)
+                        if (port_index > PORTS_MAX)
                         {
                             print_error_and_exit("Too many ports");
                         }
@@ -67,7 +67,7 @@ static void parse_ports(const char *const port_str, int ports_out[PORTS_MAX])
                 {
                     const int port = atoi(port_ranges[i]);
                     ports_out[port_index++] = port;
-                    if (port_index >= PORTS_MAX)
+                    if (port_index > PORTS_MAX)
                     {
                         print_error_and_exit("Too many ports");
                     }
