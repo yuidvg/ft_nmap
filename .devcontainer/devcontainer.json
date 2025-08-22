@@ -6,7 +6,9 @@
 	"image": "mcr.microsoft.com/devcontainers/base:debian",
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
-		"ghcr.io/devcontainers/features/nix:1": {}
+		"ghcr.io/devcontainers/features/nix:1": {
+			"extraNixConfig": "experimental-features = nix-command flakes"
+		}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
@@ -14,14 +16,12 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"ms-vscode.cpptools",
-				"ms-vscode.makefile-tools"
+				"anysphere.cpptools"
 			]
 		},
 		"cursor": {
 			"extensions": [
-				"ms-vscode.cpptools",
-				"ms-vscode.makefile-tools"
+				"anysphere.cpptools"
 			]
 		}
 	},
