@@ -267,33 +267,33 @@ testcases :: [TestCase]
 testcases =
   [ TestCase
       { testName = "SYN with large port range",
-        nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
     TestCase
       { testName = "UDP with large port range",
-        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
     TestCase
       { testName = "ACK with large port range",
-        nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "ACK", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
     TestCase
       { testName = "XMAS with large port range",
-        nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sX", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "XMAS", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
     TestCase
       { testName = "FIN with large port range",
-        nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sF", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "FIN", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
     TestCase
       { testName = "NULL with large port range",
-        nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "1-600"],
-        ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "1-600"]
+        nmapArgs = ["-sN", "-Pn", "1.1.1.1", "-p", "1-1024"],
+        ftNmapArgs = ["--scan", "NULL", "--ip", "1.1.1.1", "--port", "1-1024"]
       }
       -- ... add Test Cases Here
   ]

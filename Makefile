@@ -158,6 +158,7 @@ vm-up:
 vm-clean:
 	@if [ -d "$$HOME/goinfre" ] && [ -d "$$HOME/sgoinfre" ]; then \
 			.cluster/cluster2nix.sh --cleanup; \
+			rm -rf ./nixos.qcow2 ./result; \
 	else \
 		pkill -f "2223" || true; \
 		lsof -ti:2223 | xargs -r kill -9 || true; \

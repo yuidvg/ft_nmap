@@ -172,6 +172,7 @@
 
             # Enable VS Code server for Remote-SSH on NixOS
             services.vscode-server.enable = true;
+            virtualisation.diskSize = 8192;   # 単位 MiB → 8 GB
           };
       };
       nixosConfigurations = builtins.listToAttrs (
@@ -189,6 +190,7 @@
               modules = [
                 (self.nixosModules.mkVmHost hostPkgs)
                 self.nixosModules.vmGuest
+                ({ ... }: { virtualisation.diskSize = 8192; })
               ];
             };
           }
