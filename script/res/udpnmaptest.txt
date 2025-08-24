@@ -1,0 +1,37 @@
+Parsed arguments:
+  file_path: (null)
+  scan_type: 32
+  speedup: 250
+  ip_address: 45.33.32.156
+  file_path: (null)
+[*] Using interface: eth0 (10.0.2.15)
+[*] Using filter: (tcp or udp or icmp) and not src host 10.0.2.15
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+--- RECEIVED ICMP ANSWER ---
+[*] All tasks sent. Waiting for responses...
+--- RECEIVED ICMP ANSWER ---
+[*] Receiver thread finished.
+
+---| IP: 45.33.32.156 |---
+Closed/Unfiltered ports:
+Port       Service Name         Conclusion          Results
+----------------------------------------------------------------------
+269 udp closed manet
+442 udp closed cvc-hostd
+547 udp closed dhcpv6-server
+688 udp closed realm-rusd
+909 udp closed Unassigned
+1024 udp closed Unassigned
+
+Filtered ports:
+Port       Service Name         Conclusion          Results
+----------------------------------------------------------------------
+<1018 ports ignored>

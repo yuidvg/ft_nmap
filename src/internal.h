@@ -27,11 +27,6 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
 void handle_packet(t_task *tasks, const u_char *data, const uint16_t num_tasks);
 bool check_for_answer(t_task *tasks, pcap_t *handle, const uint16_t num_tasks);
 
-//send
-unsigned short checksum(unsigned short *ptr, int nbytes);
-void send_packet(const char *local_ip, const int sock, const probe_t p);
-udp_packet_t get_udp_packet_checksumed(const udp_packet_t unchecksumed_packet);
-
 // setup
 int get_local_ip_and_iface(char *iface, char *ip);
 int setup_socket();
@@ -46,3 +41,15 @@ probe_t*build_probes(const uint16_t num_probes);
 // wrapper
 char **ft_split_or_exit(char const *s, char c);
 char *strdup_or_exit(char const *s);
+
+//send_udp
+void send_udp_packet(const char *local_ip, const int sock, const struct sockaddr_in dest);
+
+//send_tcp
+void send_tcp_packet(const char *local_ip, const int sock, const struct sockaddr_in dest, scan_type_t scan_type);
+
+//send
+unsigned short checksum(unsigned short *ptr, int nbytes);
+void fill_pseudo_packet(char *pseudo_packet, const struct ip *iph, const void *header, uint8_t header_size, int protocol);
+void fill_ip_header(struct ip *iph, const char *local_ip, const struct sockaddr_in *dest, int protocol);
+void send_packet(const char *local_ip, const int sock, const probe_t p);

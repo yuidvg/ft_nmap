@@ -135,6 +135,10 @@ ALL_OBJ = $(APP_OBJ) $(APP_DEBUG_OBJ) $(DEBUG_OBJ) $(TEST_OBJ)
 # Rule
 all: $(ALL_BIN)
 
+clean_obj:
+	rm -rf $(ALL_OBJ)
+	mkdir -p $(APP_OBJ_DIR)
+
 clean:
 	rm -rf $(ALL_BIN) $(ALL_OBJ)
 	find build -mindepth 1 -not -name '.gitkeep' -not -type d -delete

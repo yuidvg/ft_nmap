@@ -69,3 +69,33 @@ ___
 21358/udp closed unknown
 30303/udp closed unknown
 33459/udp closed unknown 
+
+---
+
+Not shown: 1013 closed udp ports (port-unreach)
+PORT    STATE         SERVICE
+67/udp  open|filtered dhcps
+68/udp  open|filtered dhcpc
+123/udp open          ntp
+135/udp open|filtered msrpc
+137/udp open|filtered netbios-ns
+138/udp open|filtered netbios-dgm
+139/udp open|filtered netbios-ssn
+445/udp open|filtered microsoft-ds
+546/udp open|filtered dhcpv6-client
+547/udp open|filtered dhcpv6-server
+631/udp open|filtered ipp
+
+Not shown: 193 closed ports
+67/udp  open|filtered dhcps
+68/udp  open|filtered dhcpc
+123/udp open          ntp
+135/udp open|filtered msrpc
+137/udp open|filtered netbios-ns
+138/udp open|filtered netbios-dgm
+139/udp open|filtered netbios-ssn
+
+
+
+
+
