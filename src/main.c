@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     }
     // SETUP
     t_thread_args args;
+    clock_gettime(CLOCK_REALTIME, &args.start_time);
     args.num_tasks = count_probes(probes);
     if (DEBUG)
         printf("[*] Created %d probes\n", args.num_tasks);
@@ -49,14 +50,13 @@ int main(int argc, char *argv[])
         perror("Could not determine local IP/interface");
         exit(EXIT_FAILURE);
     }
-    printf("[*] Using interface: %s (%s)\n", args.iface, args.local_ip);
+    printf("Using interface: %s (%s)\n", args.iface, args.local_ip);
 
     args.sock = setup_socket();
     args.handle = setup_handle(args.iface);
     setup_filter(args.handle, args.local_ip); // Needs to be improved A LOT
 
     // SENDING (AND RECEIVING) THE PACKETS
-
     pthread_t *threads = safe_malloc_or_exit((config.number_of_threads) * (sizeof(pthread_t)));
     if (!threads)
     {
@@ -65,22 +65,20 @@ int main(int argc, char *argv[])
     }
     args.task_index = 0;
     args.all_tasks_sent = false;
-    args.finish_time = 0;
     args.scan_type = config.scan_type;
-    if (DEBUG)
-        printf("[*] Starting %d threads...\n", config.number_of_threads);
+    printf("Starting scanning with %d threads...\n", config.number_of_threads);
     for (int i = 0; i < config.number_of_threads; ++i)
     {
-        usleep(10000); //10ms //add more? Or condition to 
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0)
         {
             fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
             //<handle error>!
         }
+        usleep(10000); //10ms 
     }
     worker((void *)&args);
-    for (int i = 0; i < config.number_of_threads; ++i)//shouldn't we wait for the main thread too?
+    for (int i = 0; i < config.number_of_threads; ++i)
     {
         pthread_join(threads[i], NULL);
     }

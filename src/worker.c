@@ -2,6 +2,10 @@
 
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+float get_time_diff(const struct timespec start, const struct timespec end) {
+    return (float)(end.tv_sec - start.tv_sec) + (float)(end.tv_nsec - start.tv_nsec) / 1e9;
+}
+
 char *get_service_name(const uint16_t port, const char *protocol) {
     struct servent *se;
     se = getservbyport(htons(port), protocol); // "tcp" or "udp"
@@ -43,7 +47,7 @@ void* worker(void* arg) {
         if (args->task_index >= args->num_tasks) {// When all tasks are sent, we choose a thread to be the receiver and we lock the timer
             if (!args->all_tasks_sent) {
                 args->all_tasks_sent = true;
-                args->finish_time = time(NULL);
+                clock_gettime(CLOCK_REALTIME, &args->finish_time);
                 is_receiver = true;
             }
             pthread_mutex_unlock(&queue_mutex);
@@ -63,12 +67,16 @@ void* worker(void* arg) {
 
     //Dedicated thread (the one that sent the last task) handle the responses until the timeout
     if (is_receiver) {
-        printf("[*] All tasks sent. Waiting for responses...\n");
+        printf("All tasks sent - Scanning took %fs - Waiting for responses...\n", get_time_diff(args->start_time, args->finish_time));
         bool check_message = true;
-        while (check_message || (time(NULL) - args->finish_time) < TIMEOUT) {
+        struct timespec current_time;
+        clock_gettime(CLOCK_REALTIME, &current_time);
+        while (check_message || get_time_diff(args->finish_time, current_time) < TIMEOUT) {
             check_message = check_for_answer(args->tasks, args->handle, args->num_tasks);
+            clock_gettime(CLOCK_REALTIME, &current_time);
+            usleep(10000);
         }
-        printf("[*] Receiver thread finished.\n");
+        printf("Timeout over - printing results:\n");
     }
     return NULL;
 }

@@ -95,6 +95,7 @@ typedef struct s_thread_args
     uint16_t task_index;
     uint16_t num_tasks;
     bool all_tasks_sent;
-    time_t finish_time;
+    struct timespec start_time;
+    struct timespec finish_time;
     scan_type_t scan_type;
 } t_thread_args;

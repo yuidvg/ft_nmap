@@ -53,7 +53,7 @@ void setup_filter(pcap_t *handle, char *local_ip) {
     char filter_exp[256];
     //set tcp while excluding the local ip
     snprintf(filter_exp, sizeof(filter_exp), "(tcp or udp or icmp) and not src host %s", local_ip);
-    printf("[*] Using filter: %s\n", filter_exp);
+    printf("Using filter: %s\n", filter_exp);
     struct bpf_program fp;
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) < 0 ||
         pcap_setfilter(handle, &fp) < 0) {

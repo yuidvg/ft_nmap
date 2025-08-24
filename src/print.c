@@ -165,7 +165,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
     uint32_t current_task = 0;
 
     while (current_task + ports_num <= num_tasks) {
-        printf("\n---| IP: %s |---\n", inet_ntoa(tasks[current_task].probe.address.sin_addr));
+        printf("\n■■■■■■■■■■■■■■■■■■■■■■■\n█ IP: %-15s █\n■■■■■■■■■■■■■■■■■■■■■■■\n", inet_ntoa(tasks[current_task].probe.address.sin_addr));
         uint8_t ports_status = get_ports_status(tasks, current_task, ports_num, config.scan_type);
         uint16_t filtered_count = 0;
 
@@ -199,7 +199,7 @@ void print_results(t_task *tasks, const uint16_t num_tasks, const ft_nmap_config
             }
         }
         if (filtered_count > 0 && !DISPLAY_FILTERED)
-            printf("<%d ports ignored>\n", filtered_count);
+            printf("<%d port.s ignored>\n", filtered_count);
         current_task += ports_num;
     }
 }
