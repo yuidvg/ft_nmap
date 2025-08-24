@@ -56,7 +56,6 @@ int main(int argc, char *argv[])
     setup_filter(args.handle, args.local_ip); // Needs to be improved A LOT
 
     // SENDING (AND RECEIVING) THE PACKETS
-
     pthread_t *threads = malloc((config.number_of_threads) * (sizeof(pthread_t)));
     if (!threads)
     {
@@ -66,10 +65,12 @@ int main(int argc, char *argv[])
     args.task_index = 0;
     args.all_tasks_sent = false;
     args.finish_time = 0;
+    args.scan_type = config.scan_type;
     if (DEBUG)
         printf("[*] Starting %d threads...\n", config.number_of_threads);
     for (int i = 0; i < config.number_of_threads; ++i)
     {
+        usleep(10000); //10ms //add more? Or condition to 
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0)
         {
@@ -82,7 +83,6 @@ int main(int argc, char *argv[])
     {
         pthread_join(threads[i], NULL);
     }
-
     // RESULTS AND CLEANUP
     print_results(args.tasks, args.num_tasks, config); // Print the results of the scan
 

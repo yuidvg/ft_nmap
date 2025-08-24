@@ -39,6 +39,7 @@ typedef enum
     SCAN_TYPE_XMAS = 1 << 4,
     SCAN_TYPE_UDP = 1 << 5,
     SCAN_TYPE_ALL = SCAN_TYPE_SYN | SCAN_TYPE_NULL | SCAN_TYPE_FIN | SCAN_TYPE_XMAS | SCAN_TYPE_ACK | SCAN_TYPE_UDP,
+    SCAN_NUMBER = 6
 } scan_type_t;
 
 typedef struct
@@ -70,13 +71,14 @@ typedef struct s_task
     t_task_status status;
     t_result result;
     time_t start;
+    char service_name[64];
 } t_task;
 
 typedef struct
 {
     struct ip ip_header;
     struct udphdr udp_header;
-    uint8_t payload[24];
+    uint8_t payload[48];
 } udp_packet_t;
 
 #ifndef IFNAMSIZ
@@ -94,4 +96,5 @@ typedef struct s_thread_args
     uint16_t num_tasks;
     bool all_tasks_sent;
     time_t finish_time;
+    scan_type_t scan_type;
 } t_thread_args;
