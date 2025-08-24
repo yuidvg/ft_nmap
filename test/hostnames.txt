@@ -1,0 +1,6 @@
+google.com
+1.1.1.1
+amazon.com
+scanme.nmap.org
+
+
