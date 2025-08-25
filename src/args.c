@@ -132,7 +132,7 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
     {
         ports[i] = i + 1;
     }
-    const char *ip_address;
+    const char *ip_address = nullptr;
 
     static const struct option long_options[] = {{"help", no_argument, nullptr, 'h'},
                                                  {"ports", required_argument, nullptr, 'p'},
