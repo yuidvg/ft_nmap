@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
     args.sock = setup_socket();
     args.handle = setup_handle(args.iface);
-    setup_filter(args.handle, args.local_ip); // Needs to be improved A LOT
+    setup_filter(args.handle, args.local_ip);
 
     // SENDING (AND RECEIVING) THE PACKETS
     pthread_t *threads = safe_malloc_or_exit((config.number_of_threads) * (sizeof(pthread_t)));
@@ -71,11 +71,8 @@ int main(int argc, char *argv[])
     {
         const int rc = pthread_create(&threads[i], NULL, worker, (void *)&args);
         if (rc != 0)
-        {
             fprintf(stderr, "Error creating thread %d: %s\n", i, strerror(rc));
-            //<handle error>!
-        }
-        usleep(10000); //10ms 
+        usleep(10000); //10ms
     }
     worker((void *)&args);
     for (int i = 0; i < config.number_of_threads; ++i)

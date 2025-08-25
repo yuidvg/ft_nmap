@@ -71,7 +71,6 @@ typedef struct s_task
     t_task_status status;
     t_result result;
     time_t start;
-    char service_name[64];
 } t_task;
 
 typedef struct

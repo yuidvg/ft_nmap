@@ -6,12 +6,6 @@ float get_time_diff(const struct timespec start, const struct timespec end) {
     return (float)(end.tv_sec - start.tv_sec) + (float)(end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
-char *get_service_name(const uint16_t port, const char *protocol) {
-    struct servent *se;
-    se = getservbyport(htons(port), protocol); // "tcp" or "udp"
-    return se ? se->s_name : "Unassigned";
-}
-
 t_task *build_tasks(const probe_t *probes, const uint16_t num_tasks) {
     t_task *tasks = safe_malloc_or_exit(sizeof(t_task) * num_tasks);
     if (!tasks)
@@ -59,10 +53,6 @@ void* worker(void* arg) {
         args->tasks[my_index].start = time(NULL);
         send_packet(args->local_ip, args->sock, args->tasks[my_index].probe);
         args->tasks[my_index].status = SENT;
-        if (args->scan_type == SCAN_TYPE_ALL && my_index % SCAN_NUMBER != 0) // Here to avoid computing the same service name for every task of the same port
-            strncpy(args->tasks[my_index].service_name, args->tasks[my_index - (my_index % SCAN_NUMBER)].service_name, sizeof(args->tasks[my_index].service_name) - 1);
-        else
-            strncpy(args->tasks[my_index].service_name, get_service_name(ntohs(args->tasks[my_index].probe.address.sin_port), args->tasks[my_index].probe.scan_type == SCAN_TYPE_UDP ? "udp" : "tcp"), sizeof(args->tasks[my_index].service_name) - 1);
     }
 
     //Dedicated thread (the one that sent the last task) handle the responses until the timeout

@@ -8,6 +8,12 @@
 #define DISPLAY_FILTERED 0
 #define TEST_DISPLAY 1
 
+char *get_service_name(const uint16_t port, const char *protocol) {
+    struct servent *se;
+    se = getservbyport(htons(port), protocol); // "tcp" or "udp"
+    return se ? se->s_name : "Unassigned";
+}
+
 char *scan_type2str(const scan_type_t scan_type) {
     switch (scan_type) {
     case SCAN_TYPE_SYN:
@@ -131,7 +137,7 @@ void print_result(const t_task *tasks, const uint16_t i, const scan_type_t scan_
         }
     }
     
-    const char *service_name_str = tasks[i].service_name;
+    const char *service_name_str = get_service_name(port, tasks[i].probe.scan_type == SCAN_TYPE_UDP ? "udp" : "tcp");
     const char *conclusion_str = result2str(tasks[i].result);
     if (TEST_DISPLAY && scan_type != SCAN_TYPE_ALL)
         printf("%d %s %s\n", port, result_str, service_name_str);
