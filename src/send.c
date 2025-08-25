@@ -61,11 +61,9 @@ void send_packet(const char *local_ip, const int sock, const probe_t p) {
     dest.sin_port = p.address.sin_port;                // Convert the port to the network byte order
     dest.sin_addr = p.address.sin_addr;                // Convert the target IP to binary form and assign it directly
 
-    if (p.scan_type == SCAN_TYPE_UDP) {
+    if (p.scan_type == SCAN_TYPE_UDP)
         send_udp_packet(local_ip, sock, dest);
-        return;
-    } else {
+    else
         send_tcp_packet(local_ip, sock, dest, p.scan_type);
-    }
-    usleep(10000); // 10ms
+    usleep(100000); // 100ms
 }

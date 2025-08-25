@@ -132,7 +132,7 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
     {
         ports[i] = i + 1;
     }
-    const char *ip_address;
+    const char *ip_address = nullptr;
 
     static const struct option long_options[] = {{"help", no_argument, nullptr, 'h'},
                                                  {"ports", required_argument, nullptr, 'p'},
@@ -2370,9 +2370,9 @@ static size_t count_scan_types(const scan_type_t scan_type)
     return 1;
 }
 
-static struct sockaddr_in ip_address_and_port2sockaddr_or_exit(const char *const ip_address, const int port)
+static struct sockaddr_in ip_address_and_port2sockaddr_or_exit(const char *const ip_address)
 {
-    struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(port), .sin_addr = {.s_addr = 0}};
+    struct sockaddr_in addr = {.sin_family = AF_INET, .sin_addr = {.s_addr = 0}};
 
     if (inet_pton(AF_INET, ip_address, &addr.sin_addr) == 1) // Try to parse dotted‐decimal IPv4 first
     {
@@ -2399,20 +2399,19 @@ probe_t *config2probes(const ft_nmap_config_t config)
     const size_t num_ip_addresses = count_ip_addresses(config.ip_addresses);
     const size_t num_ports = count_ports(config.ports);
     const size_t num_scan_types = count_scan_types(config.scan_type);
-
     const size_t total_probes = num_ip_addresses * num_ports * num_scan_types;
     probe_t *probes = safe_malloc_or_exit((total_probes + 1) * sizeof(probe_t));
-
     for (size_t ip_idx = 0; ip_idx < num_ip_addresses; ++ip_idx)
     {
+        struct sockaddr_in destination =
+                ip_address_and_port2sockaddr_or_exit(config.ip_addresses[ip_idx]);
         for (size_t port_idx = 0; port_idx < num_ports; ++port_idx)
         {
+            destination.sin_port = htons(config.ports[port_idx]);
             for (size_t scan_type_idx = 0; scan_type_idx < num_scan_types; ++scan_type_idx)
             {
                 const size_t probe_index =
                     ip_idx * num_ports * num_scan_types + port_idx * num_scan_types + scan_type_idx;
-                const struct sockaddr_in destination =
-                    ip_address_and_port2sockaddr_or_exit(config.ip_addresses[ip_idx], config.ports[port_idx]);
                 probes[probe_index] = (probe_t){
                     .address = destination,
                     .scan_type = num_scan_types == 1 ? config.scan_type : SCAN_TYPE_INDEX_2SCAN_TYPE(scan_type_idx)};
