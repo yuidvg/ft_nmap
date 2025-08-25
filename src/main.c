@@ -6,8 +6,16 @@ extern pthread_mutex_t queue_mutex;
 bool g_display_filtered = true;
 bool g_test_display = false;
 
+static void on_sigint(int sig)
+{
+    (void)sig;
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char *argv[])
 {
+    signal(SIGINT, on_sigint);
+
     const ft_nmap_args_t command_line_args = parse_arguments(argc, argv);
 
     /* Print the parsed arguments for debugging/verification */

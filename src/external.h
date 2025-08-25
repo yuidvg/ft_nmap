@@ -54,3 +54,4 @@ typedef unsigned int u_int;
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
