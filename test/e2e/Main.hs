@@ -165,7 +165,7 @@ parseFtNmapResult input =
 
 splitByIPSection :: String -> [NonEmptyString]
 splitByIPSection whole =
-  let sections :: [String] = drop 1 $ splitOn "---| IP:" whole
+  let sections :: [String] = drop 1 $ splitOn "█ IP:" whole
    in mapMaybe NE.nonEmpty sections
 
 nonEmptyLines :: NonEmptyString -> NE.NonEmpty String
@@ -375,8 +375,8 @@ testcases = [
       ,
     TestCase
       { testName = "UDP with scanme",
-        nmapArgs = ["-sU", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
+        nmapArgs = ["-sU", "-Pn", "scanme.nmap.org", "-p", "65530,65534,65535"],
+        ftNmapArgs = ["--scan", "UDP", "--ip", "scanme.nmap.org", "--port", "65530,65534,65535"]
       }
       ,
     TestCase
@@ -410,7 +410,7 @@ conductTest testCase' =
   do
     nmapOutputRaw <- readProcess "nmap" (testCase'.nmapArgs ++ ["-oX", "/dev/stdout", "--noninteractive"]) ""
     let nmapOutput = trimToXML nmapOutputRaw
-    ftNmapOutput <- readProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["--speedup", "250"]) ""
+    ftNmapOutput <- readProcess "./build/bin/ft_nmap" (testCase'.ftNmapArgs ++ ["--speedup", "250" , "--test"]) ""
     -- putStrLn $ "nmapOutput: " ++ nmapOutput  -- debug snippet
     nmapResult <- parseNmapResult nmapOutput
     let ftNmapResult = parseFtNmapResult ftNmapOutput
@@ -433,7 +433,6 @@ tests =
 main :: IO ()
 main = defaultMain tests
 
--- | 前置き／後置きの行を落として純粋な XML だけ残す
 trimToXML :: String -> String
 trimToXML =
   unlines               -- 行リスト → 文字列

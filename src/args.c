@@ -140,11 +140,12 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
                                                  {"file", required_argument, nullptr, 'f'},
                                                  {"speedup", required_argument, nullptr, 's'},
                                                  {"scan", required_argument, nullptr, 'S'},
+                                                 {"test", no_argument, nullptr, 't'},
                                                  {0, 0, 0, 0}};
     int option_index = 0;
     int c;
 
-    while ((c = getopt_long(argc, argv, "hp:i:f:s:S:", long_options, &option_index)) != -1)
+    while ((c = getopt_long(argc, argv, "hp:i:f:s:S:t", long_options, &option_index)) != -1)
     {
         switch (c)
         {
@@ -189,6 +190,11 @@ ft_nmap_args_t parse_arguments(const int argc, char *const argv[])
 
         case 'S':
             scan_type = str2scantype(optarg);
+            break;
+
+        case 't':
+            g_display_filtered = true;
+            g_test_display = true;
             break;
 
         case '?':
