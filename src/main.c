@@ -3,6 +3,9 @@
 
 extern pthread_mutex_t queue_mutex;
 
+bool g_display_filtered = true;
+bool g_test_display = false;
+
 int main(int argc, char *argv[])
 {
     const ft_nmap_args_t command_line_args = parse_arguments(argc, argv);

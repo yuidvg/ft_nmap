@@ -53,3 +53,7 @@ unsigned short checksum(unsigned short *ptr, int nbytes);
 void fill_pseudo_packet(char *pseudo_packet, const struct ip *iph, const void *header, uint8_t header_size, int protocol);
 void fill_ip_header(struct ip *iph, const char *local_ip, const struct sockaddr_in *dest, int protocol);
 void send_packet(const char *local_ip, const int sock, const probe_t p);
+
+
+extern bool g_display_filtered;
+extern bool g_test_display;
