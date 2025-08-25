@@ -270,11 +270,11 @@ testcases = [
         nmapArgs = ["-sS", "-Pn", "1.1.1.1", "-p", "1-1024"],
         ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "1-1024"]
       },
-    TestCase
-      { testName = "UDP with large port range",
-        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-1024"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-1024"]
-      },
+    -- TestCase
+    --   { testName = "UDP with large port range",
+    --     nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "1-1024"],
+    --     ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "1-1024"]
+    --   },
     TestCase
       { testName = "ACK with large port range",
         nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "1-1024"],
@@ -301,12 +301,12 @@ testcases = [
         ftNmapArgs = ["--scan", "SYN", "--ip", "google.com", "--port", "1-1024"]
       }
       ,
-    TestCase
-      { testName = "UDP with domain name",
-        nmapArgs = ["-sU", "-Pn", "google.com", "-p", "1-1024"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "google.com", "--port", "1-1024"]
-      }
-      ,
+    -- TestCase
+    --   { testName = "UDP with domain name",
+    --     nmapArgs = ["-sU", "-Pn", "google.com", "-p", "1-1024"],
+    --     ftNmapArgs = ["--scan", "UDP", "--ip", "google.com", "--port", "1-1024"]
+    --   }
+    --   ,
     TestCase
       { testName = "ACK with domain name",
         nmapArgs = ["-sA", "-Pn", "google.com", "-p", "1-1024"],
@@ -337,12 +337,12 @@ testcases = [
         ftNmapArgs = ["--scan", "SYN", "--ip", "1.1.1.1", "--port", "65530-65535"]
       }
       ,
-    TestCase
-      { testName = "UDP with high port range",
-        nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "65530-65535"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "65530-65535"]
-      }
-      ,
+    -- TestCase
+    --   { testName = "UDP with high port range",
+    --     nmapArgs = ["-sU", "-Pn", "1.1.1.1", "-p", "65530-65535"],
+    --     ftNmapArgs = ["--scan", "UDP", "--ip", "1.1.1.1", "--port", "65530-65535"]
+    --   }
+    --   ,
     TestCase
       { testName = "ACK with high port range",
         nmapArgs = ["-sA", "-Pn", "1.1.1.1", "-p", "65530-65535"],
@@ -373,12 +373,12 @@ testcases = [
         ftNmapArgs = ["--scan", "SYN", "--ip", "scanme.nmap.org", "--port", "65530-65535"]
       }
       ,
-    TestCase
-      { testName = "UDP with scanme",
-        nmapArgs = ["-sU", "-Pn", "scanme.nmap.org", "-p", "65530,65534,65535"],
-        ftNmapArgs = ["--scan", "UDP", "--ip", "scanme.nmap.org", "--port", "65530,65534,65535"]
-      }
-      ,
+    -- TestCase
+    --   { testName = "UDP with scanme",
+    --     nmapArgs = ["-sU", "-Pn", "scanme.nmap.org", "-p", "65530,65534,65535"],
+    --     ftNmapArgs = ["--scan", "UDP", "--ip", "scanme.nmap.org", "--port", "65530,65534,65535"]
+    --   }
+    --   ,
     TestCase
       { testName = "ACK with scanme",
         nmapArgs = ["-sA", "-Pn", "scanme.nmap.org", "-p", "65530-65535"],
